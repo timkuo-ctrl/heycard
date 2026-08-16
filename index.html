@@ -7157,8 +7157,10 @@ SCREENS.pubview=(a)=>{
         短的東西和長的東西擠同一格，長的一多就亂。
 
    規則（照 IG／LinkedIn 的作法）：
-   ① 漸層頁首只放「名片上有的」：Logo、姓名、職稱、公司。
-      這些永遠一到兩行，版面穩。
+   ① 漸層頁首只放「名片上有的」：Logo、姓名、英文名、職稱、公司、
+      電話、Email、網址——跟實體名片一樣。這些天生短，版面穩。
+      電話／Email 在頁首是「看」，下面「聯絡與連結」是「點與複製」，
+      兩處都要有，不重複——用途不同。
    ② 自我介紹搬出來，白底一段落，叫「關於」。
       15px、行高 1.85、超過四行摺疊成「更多」。長文在白底上才讀得下去。
    ③ 公司名太長時，頁首用簡稱，全名放到「關於」段落的第一行。
@@ -7220,6 +7222,19 @@ SCREENS.pubview=(a)=>{
      +(roleMain?'<div style="font-size:15px;font-weight:700;letter-spacing:-.01em;line-height:1.45;color:'+ink+'">'+esc(roleMain)+'</div>':'')
      +(coShort?'<div style="font-size:13px;line-height:1.55;color:'+sub+';margin-top:'+(roleMain?4:0)+'px">'+esc(coShort)+'</div>':'')
      +'</div>':'')
+   /* 聯絡：名片上該有的——電話、Email、網址。這裡是「看」，下面的清單是「點與複製」 */
+   +(function(){
+     const L=[];
+     if(c.tel)L.push(['T',c.tel,'tel:'+String(c.tel).replace(/\s/g,'')]);
+     if(c.email)L.push(['E',c.email,'mailto:'+c.email]);
+     if(c.web)L.push(['W',c.web,(/^https?:/.test(c.web)?'':'https://')+c.web]);
+     if(!L.length)return '';
+     return '<div style="height:1px;background:'+mk+';margin:20px 0 14px"></div>'
+     +'<div style="display:flex;flex-direction:column;gap:7px">'
+     +L.map(function(r){return '<a href="'+esc(r[2])+'" style="display:flex;gap:10px;align-items:baseline;color:inherit;text-decoration:none;min-width:0">'
+       +'<span style="font-family:var(--fe);font-size:10px;letter-spacing:.06em;color:'+mut+';width:12px;flex:0 0 auto">'+r[0]+'</span>'
+       +'<span style="font-family:var(--fe);font-size:12.5px;font-weight:400;color:'+sub+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(r[1])+'</span></a>'}).join('')
+     +'</div>'})()
    +'<div class="ftx" style="font-size:9px;letter-spacing:.26em;color:'+mut+';margin-top:24px"><span>Hey</span><span>to</span><span>Connect</span></div>'
    +'</div></div>';
 
