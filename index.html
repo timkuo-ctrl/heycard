@@ -1305,7 +1305,7 @@ SCREENS.settings=()=>screen(tbTitle('設定')
  +[['allowRec','允許我的人脈推薦我','關閉後不會出現在新的引薦中'],['notifyUpd','名片更新通知','有人更新名片時通知我']]
   .map((r,i)=>'<div style="display:flex;align-items:center;gap:11px;padding:13px 14px;'+(i===0?'border-bottom:1px solid var(--hair)':'')+'">'
   +'<div style="flex:1"><div style="font-size:12.5px;font-weight:400">'+r[1]+'</div><div class="tip" style="margin-top:2px">'+r[2]+'</div></div>'
-  +'<div class="sw'+(S.flag(r[0])===false?'':' on')+'" data-flag="'+r[0]+'"><i></i></div></div>').join('')+'</div>'
+  +'<div class="sw'+((S.flags||{})[r[0]]===false?'':' on')+'" data-flag="'+r[0]+'"><i></i></div></div>').join('')+'</div>'
  +'<div class="sec"><b>資料</b></div>'
  +'<div class="pl" style="padding:0">'
  +'<button data-act="export" style="width:100%;text-align:left;display:flex;align-items:center;gap:11px;padding:13px 14px;border-bottom:1px solid var(--hair)">'
@@ -3776,7 +3776,7 @@ SCREENS.me=()=>{
 
   +'<button data-act="aiDesign" style="width:100%;text-align:left;display:flex;align-items:center;gap:10px;padding:14px 0;margin-top:28px;border-bottom:1px solid var(--hair)">'
   +'<span style="font-size:14px">AI 幫我設計名片</span>'
-  +'<span style="font-size:11px;color:var(--mang);font-family:var(--fe);font-weight:700">PRO</span>'
+  +'<span style="font-size:11px;color:var(--mang);font-family:var(--fe);font-weight:700">PLUS</span>'
   +'<span style="flex:1"></span>'+ico('arr',15,'#C4C4CC')+'</button>';
 
  return el};
@@ -4236,7 +4236,7 @@ SCREENS.aiDesign=()=>{
  if(op){
   const row=h('<button data-brand="1" style="width:100%;text-align:left;display:flex;align-items:center;gap:10px;padding:16px 0;margin-top:8px;border-top:1px solid var(--hair)">'
    +'<span style="font-size:14px">隱藏名片上的 Heycard 標記</span>'
-   +'<span style="font-size:11px;color:var(--mang);font-family:var(--fe);font-weight:700">PRO</span>'
+   +'<span style="font-size:11px;color:var(--mang);font-family:var(--fe);font-weight:700">PLUS</span>'
    +'<span style="flex:1"></span>'
    +'<span class="sw'+(cur.hideBrand?' on':'')+'"><i></i></span></button>');
   op.parentNode.insertBefore(row,op.nextSibling)}
@@ -5486,7 +5486,7 @@ SCREENS.post=(a)=>{
       改為顯示可回復的錯誤畫面。永遠不要空白。
    ═══════════════════════════════════════════ */
 
-const SCHEMA=20;
+const SCHEMA=21;
 
 (function migrate(){
  let v=0;
@@ -5497,7 +5497,7 @@ const SCHEMA=20;
   try{DB.set(k,undefined);localStorage.removeItem('hc_'+k)}catch(e){}});
  /* 重跑種子旗標 */
  const f=DB.get('flags',{})||{};
- ['v04seed','v05feed','v14fields','v19assets','v22solo'].forEach(function(k){delete f[k]});
+ ['v04seed','v05feed','v14fields','v19assets','v22solo','v24myfeel'].forEach(function(k){delete f[k]});
  DB.set('flags',f);
  /* 示範貼文就地重建。本檔跑在種子之後，光清旗標的話，
     這一輪的動態牆會是空的，要等下次開 app 才補回來。 */
@@ -6725,6 +6725,430 @@ function idLine(c){
    verified:1,photo:(typeof FACES==='object'?FACES.f2:''),others:[]});
   S.contacts=cs}
  S.flag('v22solo',true)})();
+/* ═══════════════════════════════════════════
+   v2.3 覆寫 ㉜：訂閱方案
+   ─────────────────────────────────────────
+   兩個等級，各自對應一件很具體的事：
+
+   Plus  NT$79／月   名片是你的——去掉 Heycard 標記、自由配色
+   Pro   NT$179／月  人脈會思考——洞察全開、AI 搜尋額度 ×10
+                     年繳送一張 NFC 實體卡
+
+   設計原則：
+   ① 鎖住的功能要「看得到、摸不到」——洞察給模糊預覽，
+      不是一面牆說「請升級」。人先知道自己錯過什麼，才會付錢。
+   ② 付費牆只在使用者真的碰到功能時出現，不主動打擾。
+   ③ 方案頁講得到什麼，不講不付會怎樣。（文案語氣準則）
+   ④ 原型：按下訂閱直接開通，不真的收錢。
+   ═══════════════════════════════════════════ */
+
+const PLANS={
+ free:{n:'Free',price:0,  tag:''},
+ plus:{n:'Plus',price:79, tag:'名片是你的'},
+ pro: {n:'Pro', price:179,tag:'人脈會思考'}};
+const PLAN_RANK={free:0,plus:1,pro:2};
+const AI_QUOTA={free:20,plus:20,pro:200};   /* 每月 AI 搜尋額度 */
+
+function plan(){return DB.get('plan','free')||'free'}
+function planAtLeast(p){return PLAN_RANK[plan()]>=PLAN_RANK[p]}
+function setPlan(p,cycle){DB.set('plan',p);DB.set('planCycle',cycle||'m');DB.set('planSince',new Date().toISOString().slice(0,10))}
+function planCycle(){return DB.get('planCycle','m')||'m'}
+
+/* AI 搜尋額度：每月歸零 */
+function aiUsed(){
+ const k=new Date().toISOString().slice(0,7);
+ const o=DB.get('aiUse',{})||{};
+ return +o[k]||0}
+function aiBump(){
+ const k=new Date().toISOString().slice(0,7);
+ const o=DB.get('aiUse',{})||{};o[k]=(+o[k]||0)+1;DB.set('aiUse',o)}
+function aiLeft(){return Math.max(0,AI_QUOTA[plan()]-aiUsed())}
+
+/* 舊常數 PRO=true 是測試全開；現在改由方案決定 */
+function isPlus(){return planAtLeast('plus')}
+function isPro(){return planAtLeast('pro')}
+
+/* ═════ 方案頁 ═════ */
+let PLAN_CYCLE='y';   /* 預設顯示年繳——那是有 NFC 卡的那一邊 */
+
+function planCard(key,cycle){
+ const P=PLANS[key],cur=plan()===key;
+ const yearly=cycle==='y';
+ const price=yearly?Math.round(P.price*10):P.price;   /* 年繳 = 10 個月價 */
+ const feats={
+  plus:[['名片上不再有 Heycard 標記','你的名片，只有你的品牌'],
+        ['自由配色','材質之外，色調由你決定'],
+        ['所有版式與 Logo 位置','']],
+  pro: [['洞察全開','人脈的結構、變化、往返，AI 幫你看'],
+        ['AI 搜尋額度 ×10','每月 200 次，直接問人脈'],
+        ['包含 Plus 全部功能',''],
+        [yearly?'免費一張 NFC 實體卡':'年繳送 NFC 實體卡',yearly?'年繳訂閱寄到府，一碰就交換':'切換到年繳即享']]}[key];
+ const dark=key==='pro';
+ return '<div style="padding:20px;border-radius:18px;'+(dark?'background:var(--ink);color:#fff':'background:#fff;border:1px solid var(--e6)')+'">'
+ +'<div style="display:flex;align-items:baseline;gap:10px">'
+ +'<span style="font-family:var(--fe);font-size:20px;font-weight:700;letter-spacing:-.02em">'+P.n+'</span>'
+ +'<span style="font-size:12.5px;'+(dark?'color:rgba(255,255,255,.62)':'color:var(--ink3)')+'">'+esc(P.tag)+'</span>'
+ +(cur?'<span style="margin-left:auto;font-size:11px;padding:4px 9px;border-radius:99px;'+(dark?'background:rgba(255,255,255,.14);color:#fff':'background:var(--mangS);color:var(--mang)')+'">目前方案</span>':'')
+ +'</div>'
+ +'<div style="display:flex;align-items:baseline;gap:6px;margin-top:14px">'
+ +'<span style="font-family:var(--fe);font-size:12.5px;'+(dark?'color:rgba(255,255,255,.62)':'color:var(--ink3)')+'">NT$</span>'
+ +'<span style="font-family:var(--fe);font-size:34px;font-weight:300;letter-spacing:-.04em;line-height:1">'+price.toLocaleString()+'</span>'
+ +'<span style="font-size:12.5px;'+(dark?'color:rgba(255,255,255,.62)':'color:var(--ink3)')+'">／'+(yearly?'年':'月')+'</span>'
+ +(yearly?'<span style="margin-left:8px;font-size:11px;'+(dark?'color:var(--turq)':'color:var(--turqD)')+'">省兩個月</span>':'')
+ +'</div>'
+ +'<div style="margin-top:18px">'
+ +feats.map(function(f){return '<div style="display:flex;gap:10px;padding:7px 0;align-items:flex-start">'
+   +'<span style="display:flex;flex:0 0 auto;margin-top:2px;color:'+(dark?'var(--turq)':'var(--mang)')+'">'+ico('ck',15,'currentColor',2.8)+'</span>'
+   +'<div><div style="font-size:14px;line-height:1.5">'+esc(f[0])+'</div>'
+   +(f[1]?'<div style="font-size:12.5px;line-height:1.6;margin-top:1px;'+(dark?'color:rgba(255,255,255,.58)':'color:var(--ink3)')+'">'+esc(f[1])+'</div>':'')
+   +'</div></div>'}).join('')
+ +'</div>'
+ +'<button data-sub="'+key+'" class="btn" style="margin-top:18px;'+(dark?'background:#fff;color:var(--ink)':'')+'"'+(cur?' disabled':'')+'>'
+ +(cur?'使用中':(PLAN_RANK[key]<PLAN_RANK[plan()]?'改為 '+P.n:'訂閱 '+P.n))+'</button>'
+ +'</div>'}
+
+SCREENS.plans=(a)=>{
+ a=a||{};
+ const el=screen(tbTitle('方案')
+ +'<div class="body pad" style="padding-top:18px;padding-bottom:calc(28px + var(--sab))">'
+ +(a.why?'<div style="padding:14px 16px;background:var(--fill);border-radius:14px;margin-bottom:18px;font-size:14px;line-height:1.7">'+esc(a.why)+'</div>':'')
+ +'<div style="display:flex;background:var(--fill);border-radius:12px;padding:4px;margin-bottom:18px" id="cyc"></div>'
+ +'<div id="cards" style="display:flex;flex-direction:column;gap:12px"></div>'
+ +'<div style="font-size:12.5px;color:var(--ink3);line-height:1.8;margin-top:22px;text-align:center">'
+ +'隨時可以取消，用到期末為止。'+(plan()!=='free'?'<br>目前是 '+PLANS[plan()].n+'（'+(planCycle()==='y'?'年繳':'月繳')+'）':'')+'</div>'
+ +'</div>');
+ const draw=function(){
+  $('#cyc',el).innerHTML=[['y','年繳'],['m','月繳']].map(function(x){
+   const on=PLAN_CYCLE===x[0];
+   return '<button data-cyc="'+x[0]+'" style="flex:1;padding:9px;border-radius:9px;font-size:13px;font-weight:'+(on?700:400)+';'
+   +'background:'+(on?'#fff':'transparent')+';color:'+(on?'var(--ink)':'var(--ink2)')+';'+(on?'box-shadow:0 1px 3px rgba(0,0,0,.08)':'')+'">'
+   +x[1]+(x[0]==='y'?'<span style="font-size:11px;color:var(--turqD);margin-left:6px">送 NFC 卡</span>':'')+'</button>'}).join('');
+  $('#cards',el).innerHTML=planCard('plus',PLAN_CYCLE)+planCard('pro',PLAN_CYCLE)};
+ el.addEventListener('click',function(e){
+  const c=e.target.closest('[data-cyc]');if(c){PLAN_CYCLE=c.dataset.cyc;draw();return}
+  const s=e.target.closest('[data-sub]');if(!s||s.disabled)return;
+  const key=s.dataset.sub;
+  sheet('<div style="font-size:17px;font-weight:700;letter-spacing:-.02em">訂閱 '+PLANS[key].n+'</div>'
+   +'<div style="font-size:14px;color:var(--ink2);line-height:1.8;margin-top:10px">'
+   +'NT$'+(PLAN_CYCLE==='y'?Math.round(PLANS[key].price*10).toLocaleString()+'／年':PLANS[key].price+'／月')
+   +(key==='pro'&&PLAN_CYCLE==='y'?'，NFC 實體卡會寄到你名片上的地址。':'。')+'</div>'
+   +'<div class="sim" style="margin-top:14px">'+ico('warn',11,'#8A6500',2.2)+'原型：不會真的扣款，按下去直接開通</div>'
+   +'<button class="btn" data-subgo="'+key+'" style="margin-top:18px">確認訂閱</button>'
+   +'<button class="tx" data-act="sheetClose" style="display:block;margin:16px auto 0">再想想</button>')});
+ setTimeout(draw,0);
+ return el};
+
+document.addEventListener('click',function(e){
+ const g=e.target.closest('[data-subgo]');
+ if(!g)return;
+ const key=g.dataset.subgo;
+ setPlan(key,PLAN_CYCLE);
+ const s=$('.sheet');if(s)s.remove();
+ R.reset('home');TAB='net';
+ toast('已開通 '+PLANS[key].n+(key==='pro'&&PLAN_CYCLE==='y'?'，NFC 卡準備中':''))});
+
+/* 統一的付費牆入口：帶著「為什麼」進方案頁 */
+function paywall(need,why){
+ R.go('plans',{why:why||''},'push')}
+
+/* ═════ 鎖點 ①：洞察 ═════ */
+const _ins41=insights2;
+insights2=function(){
+ if(isPro())return _ins41();
+ /* 免費版：真的內容模糊呈現，上面浮一張解鎖卡——看得到，摸不到 */
+ let inner='';try{inner=_ins41()}catch(e){inner=''}
+ return '<div style="position:relative">'
+ +'<div style="filter:blur(6px);opacity:.55;pointer-events:none;user-select:none;max-height:720px;overflow:hidden">'+inner+'</div>'
+ +'<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.92) 38%,#fff 100%)"></div>'
+ +'<div style="position:absolute;top:150px;left:20px;right:20px;padding:22px;background:#fff;border:1px solid var(--e6);border-radius:18px;box-shadow:0 12px 32px rgba(20,20,28,.10)">'
+ +'<div style="font-family:var(--fe);font-size:11px;font-weight:700;color:var(--mang);letter-spacing:.06em">PRO</div>'
+ +'<div style="font-size:20px;font-weight:700;letter-spacing:-.03em;margin-top:8px;line-height:1.35">讓人脈會思考</div>'
+ +'<div style="font-size:14px;color:var(--ink2);line-height:1.8;margin-top:8px">'
+ +'洞察會告訴你這 '+S.contacts.length+' 位人脈的結構、這週的變化，以及你給出和收到的往返。'
+ +'AI 搜尋額度也從每月 20 次變成 200 次。</div>'
+ +'<button class="btn" data-act="goPlans" style="margin-top:18px">看方案</button>'
+ +'<div style="font-size:12.5px;color:var(--ink3);text-align:center;margin-top:12px">NT$179／月起　·　年繳送 NFC 實體卡</div>'
+ +'</div></div>'};
+
+/* ═════ 鎖點 ②：AI 搜尋額度 ═════ */
+const _aiAnswer41=aiAnswerHTML;
+aiAnswerHTML=function(q){
+ const left=aiLeft(),quota=AI_QUOTA[plan()];
+ if(left<=0){
+  return '<div class="pad" style="padding:22px 16px 24px">'
+  +'<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><div style="max-width:78%;background:var(--mang);color:#fff;border-radius:16px 16px 4px 16px;padding:11px 13px;font-size:12.5px;line-height:1.65">'+esc(q)+'</div></div>'
+  +'<div style="padding:18px;background:var(--fill);border-radius:14px">'
+  +'<div style="font-size:15px;font-weight:700;letter-spacing:-.01em">這個月的 AI 搜尋用完了</div>'
+  +'<div style="font-size:14px;color:var(--ink2);line-height:1.8;margin-top:8px">關鍵字搜尋不受限制。想繼續用問的，Pro 每月有 200 次。</div>'
+  +'<button class="btn sm" data-act="goPlans" style="margin-top:14px;display:inline-flex">看方案</button></div></div>'}
+ aiBump();
+ const html=_aiAnswer41(q);
+ const after=quota-aiUsed();
+ /* 額度提示：接近用完才出現，不然是噪音 */
+ const hint=(after<=5)?'<div style="margin:0 16px 20px 52px;font-size:12.5px;color:var(--ink3)">這個月還剩 '+after+' 次 AI 搜尋'
+  +(isPro()?'':'　·　<button data-act="goPlans" style="color:var(--mang);font-weight:700">升級 Pro</button>')+'</div>':'';
+ return html.replace(/<\/div>\s*$/,'')+hint+'</div>'};
+
+/* ═════ 鎖點 ③：名片去標與配色 ═════ */
+document.addEventListener('click',function(e){
+ const b=e.target.closest('[data-brand]');
+ if(b&&!isPlus()){e.stopPropagation();e.preventDefault();
+  paywall('plus','拿掉名片上的 Heycard 標記，是 Plus 的功能。');return}
+ const hu=e.target.closest('[data-hue]');
+ const dt=e.target.closest('[data-dt="hue"]');
+ if((hu||dt)&&!isPlus()){
+  if(hu&&+hu.dataset.hue===0)return;   /* 回到原色不算 */
+  e.stopPropagation();e.preventDefault();
+  paywall('plus','自由配色是 Plus 的功能。材質與版式維持免費。');return}
+ const a=e.target.closest('[data-act="goPlans"]');
+ if(a){R.go('plans',{},'push')}
+},true);
+
+/* 設計器色調滑桿也要鎖 */
+document.addEventListener('input',function(e){
+ if(e.target.id==='hs'&&!isPlus()){e.target.value=0;e.stopPropagation();
+  paywall('plus','自由配色是 Plus 的功能。')}},true);
+
+/* ═════ 設定：訂閱狀態 ═════ */
+const _set41=SCREENS.settings;
+SCREENS.settings=()=>{
+ const el=_set41();
+ const bd=$('.body',el);
+ if(!bd)return el;
+ const p=plan();
+ const row=h('<div><div class="sec" style="margin-top:0"><b>訂閱</b></div>'
+  +'<button data-go="plans" style="width:100%;text-align:left;display:flex;align-items:center;gap:12px;padding:16px;border:1px solid var(--e6);border-radius:14px">'
+  +'<div style="flex:1;min-width:0"><div style="display:flex;align-items:baseline;gap:8px">'
+  +'<span style="font-family:var(--fe);font-size:17px;font-weight:700">'+PLANS[p].n+'</span>'
+  +'<span style="font-size:12.5px;color:var(--ink3)">'+(p==='free'?'免費':(planCycle()==='y'?'年繳':'月繳')+'　·　NT$'+(planCycle()==='y'?Math.round(PLANS[p].price*10).toLocaleString()+'／年':PLANS[p].price+'／月'))+'</span></div>'
+  +'<div style="font-size:12.5px;color:var(--ink3);margin-top:4px">'
+  +(p==='free'?'AI 搜尋每月 20 次　·　升級開啟洞察與名片自訂':p==='plus'?'名片已是你的　·　升級 Pro 開啟洞察':'洞察全開　·　AI 搜尋每月 200 次'+(planCycle()==='y'?'　·　NFC 卡':''))
+  +'</div></div>'+ico('arr',15,'#C4C4CC')+'</button></div>');
+ bd.insertBefore(row,bd.firstChild);
+ return el};
+
+/* ═══════════════════════════════════════════
+   v2.4 覆寫 ㉝
+   ─────────────────────────────────────────
+   ① 公司旗下的產品與網站：非用戶最缺的就是「這家公司在做什麼」。
+      公示登記只給你統編和資本額，真正有用的是他們賣什麼、
+      網站在哪。爬回來之後用磚呈現，不用文字堆。
+   ② 名片編輯補回 Email／手機（上一版重寫欄位時漏掉了），
+      名片正面清單補回「名片名稱」。
+   ═══════════════════════════════════════════ */
+
+/* ═════ ① 公司產品：資料 ═════ */
+/* products: n 名稱 · d 一句話 · url · c 品牌色 · k 類型（web／app／brand） */
+(function(){
+ if(typeof ORGS!=='object'||!ORGS)return;
+ const P={
+  '立昇電子':[
+   {n:'LS-Sense',d:'產線溫濕度與震動感測模組',url:'lisheng.com.tw/sense',c:'#007AA8',k:'brand'},
+   {n:'LS Cloud',d:'感測資料儀表板',url:'cloud.lisheng.com.tw',c:'#0A5F80',k:'web'}],
+  '好日子咖啡':[
+   {n:'好日子咖啡',d:'三家直營門市',url:'gooddays.coffee',c:'#C66A34',k:'web'},
+   {n:'叫號 Go',d:'門市叫號與出杯系統',url:'go.gooddays.coffee',c:'#8F4A22',k:'app'}],
+  '元睿創投':[
+   {n:'元睿創投',d:'早期 B2B SaaS 投資',url:'yuanrui.vc',c:'#162A56',k:'web'}],
+  '鴻程資訊':[
+   {n:'HC-ERP',d:'製造業 ERP 導入',url:'hongcheng.tw/erp',c:'#127868',k:'brand'},
+   {n:'鴻程雲',d:'中小企業雲端進銷存',url:'cloud.hongcheng.tw',c:'#0E5C50',k:'web'}],
+  '速倉科技':[
+   {n:'SuCang WMS',d:'倉儲管理系統，40 家電商導入',url:'sucang.io',c:'#5C5CFF',k:'brand'},
+   {n:'AGV Bridge',d:'倉儲設備整合中介',url:'sucang.io/bridge',c:'#3E3ED8',k:'app'}]};
+ Object.keys(P).forEach(function(n){if(ORGS[n])ORGS[n].products=P[n]});
+
+ /* 示範：麥菲爾——你講的例子 */
+ ORGS['麥菲爾']={full:'麥菲爾股份有限公司',tax:'52398471',
+  addr:'台北市中山區南京東路二段 100 號 8 樓',capital:'2,000 萬元',rep:'林承翰',
+  founded:'2016/08',ticker:'',ind:'科技業',size:'約 30 人',web:'myfeel-tw.com',
+  desc:'群眾募資與品牌孵化平台營運商。以 MYFEEL 群募平台為主力，協助新創與設計品牌上架募資；'
+   +'另開發 Mini Me 個人化商品服務。',
+  tags:['群眾募資','品牌孵化','電商'],hc:0,
+  products:[
+   {n:'MYFEEL 群募平台',d:'新創與設計品牌的募資上架',url:'myfeel-tw.com',c:'#FF5A36',k:'web'},
+   {n:'Mini Me',d:'個人化商品訂製',url:'minime.myfeel-tw.com',c:'#2B2B33',k:'app'}]};
+})();
+
+/* 產品磚：一眼看懂這家公司賣什麼 */
+function productTile(p){
+ const KIND={web:'網站',app:'服務',brand:'產品'};
+ const ch=String(p.n||'?')[0];
+ return '<button data-url="'+esc(p.url||'')+'" style="text-align:left;padding:14px;border:1px solid var(--e6);border-radius:14px;display:flex;flex-direction:column;gap:12px;min-width:0">'
+ +'<div style="display:flex;align-items:center;justify-content:space-between;width:100%">'
+ +'<div style="width:36px;height:36px;border-radius:10px;background:'+esc(p.c||'#1E1E1E')+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex:0 0 auto">'+esc(ch)+'</div>'
+ +'<span style="font-size:11px;color:var(--ink3);background:var(--fill);padding:3px 8px;border-radius:99px">'+(KIND[p.k]||'產品')+'</span></div>'
+ +'<div style="min-width:0;width:100%"><div style="font-size:14px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.n)+'</div>'
+ +'<div style="font-size:12.5px;color:var(--ink3);margin-top:3px;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.d||'')+'</div>'
+ +(p.url?'<div style="font-size:11px;color:var(--mang);margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.url)+'</div>':'')
+ +'</div></button>'}
+
+function productsHTML(O,opt){
+ opt=opt||{};
+ const list=(O&&O.products)||[];
+ if(!list.length){
+  if(!opt.showEmpty)return '';
+  return '<div style="padding:16px;border:1px dashed var(--e6);border-radius:14px;font-size:12.5px;color:var(--ink3);line-height:1.7">'
+   +'還沒爬到這家公司的產品與網站。有官網的話 AI 會自己補上。</div>'}
+ return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+list.map(productTile).join('')+'</div>'}
+
+/* 人脈詳情的公司區：概要卡下面直接接產品磚 */
+const _orgBlock42=orgBlock;
+orgBlock=function(c){
+ const html=_orgBlock42(c);
+ if(!c||!c.company)return html;
+ const O=orgOf(c.company,c);
+ const tiles=productsHTML(O,{showEmpty:!!(O&&O._soft)});
+ if(!tiles)return html;
+ /* 插在概要卡（第一個 </button>）之後 */
+ const i=html.indexOf('</button>');
+ if(i<0)return html+tiles;
+ return html.slice(0,i+9)
+  +'<div style="margin:12px 0 4px"><div style="font-size:12.5px;color:var(--ink3);margin-bottom:10px">旗下產品與網站</div>'+tiles+'</div>'
+  +html.slice(i+9)};
+
+/* 公司頁：概要之後、公示登記之前 */
+const _org42=SCREENS.org;
+SCREENS.org=(a)=>{
+ const el=_org42(a);
+ const n=a&&a.name;
+ const O=orgOf(n,S.contacts.filter(function(c){return c.company===n})[0]||{});
+ const tiles=productsHTML(O,{showEmpty:true});
+ const bd=$('.body',el);
+ if(!bd||!tiles)return el;
+ const secs=$$('.sec',bd);
+ const anchor=secs[0];
+ const blk=h('<div><div class="sec"><b>旗下產品與網站</b>'
+  +'<span style="order:2;flex:0 0 auto;font-size:11px;color:var(--ink3)">'+((O.products&&O.products.length)?'自官網與公開資料':'尚未取得')+'</span></div>'+tiles+'</div>');
+ if(anchor)anchor.parentNode.insertBefore(blk,anchor);else bd.appendChild(blk);
+ return el};
+
+/* ═════ ② 名片編輯：補回手機／Email；名片正面補回名片名稱 ═════ */
+(function(){
+ if(typeof KIND_F!=='object')return;
+ Object.keys(KIND_F).forEach(function(k){
+  const has=function(id){return KIND_F[k].some(function(f){return f[0]===id})};
+  if(!has('tel'))KIND_F[k].push(['tel','手機','0912 345 678']);
+  if(!has('email'))KIND_F[k].push(['email','Email','you@company.com'])});
+})();
+
+function tierCardRows(cur){
+ const k=idKind(cur);
+ const rows=[['label','名片名稱']].concat(
+  (k==='solo')?[['web','個人網站／作品集']]
+  :[['logo',k==='studio'?'工作室 Logo':'公司 Logo'],['web',k==='studio'?'工作室網址':'公司網址']]);
+ return rows.map(function(f){return tierRow(cur,f)}).join('')}
+
+function baseFieldSummary(cur){
+ const k=idKind(cur);
+ if(k==='solo')return '姓名、專業定位、服務項目、手機、Email';
+ if(k==='studio')return '姓名、工作室、職稱、手機、Email';
+ return '姓名、職稱、公司、手機、Email'}
+
+/* 示範人脈：一位麥菲爾的非用戶 */
+(function(){
+ if(S.flag('v24myfeel'))return;
+ const cs=S.contacts.slice();
+ if(!cs.some(function(c){return c.id==='c7'})){
+  cs.push({id:'c7',name:'林承翰',nameEn:'Cheng-Han Lin',title:'執行長',company:'麥菲爾',dept:'',
+   tel:'0919 300 512',tel2:'02 2500 8800',email:'han@myfeel-tw.com',web:'myfeel-tw.com',
+   addr:'台北市中山區南京東路二段 100 號 8 樓',industry:'科技業',level:'決策層',func:'經營管理',
+   material:'steel',met:'2026/07/28',venue:'新創聚會',via:'photo',note:'',hot:1,verified:0,others:[]});
+  S.contacts=cs}
+ S.flag('v24myfeel',true)})();
+/* ═══════════════════════════════════════════
+   v2.5 覆寫 ㉞
+   ─────────────────────────────────────────
+   ① 池化欄位「加入並使用」一步到位：加入＝選用＝儲存＝返回。
+      原本要按三次才生效，第二次之後的人都會以為沒存到。
+   ② 公開頁頁首重排：
+      · 只留一個標記——有公司 Logo 時 Heycard 標記退到底部小字，
+        不再左右各一個 Heycard 打架。
+      · 職稱與公司分兩行：職稱粗、公司細。長公司名不再把整行擠爆。
+      · 一句話介紹降一級：14px、副色、最多三行、左側一條細線。
+        它是補充，不是第二個標題。
+      · 大頭貼有的話與姓名同一列，版面不再一路往下疊。
+   ═══════════════════════════════════════════ */
+
+/* ═════ ① 加入並使用 = 立即生效 ═════ */
+const _f43=SCREENS.field;
+SCREENS.field=(a)=>{
+ const el=_f43(a);
+ if(!a||!POOLED||!POOLED[a.k])return el;
+ /* 攔在原本的 handler 之前：加入 → 寫回名片 → 返回 */
+ el.addEventListener('click',function(e){
+  if(!e.target.closest('#addv'))return;
+  const v=($('#nv',el)||{}).value||'';
+  if(!v.trim())return;
+  e.stopPropagation();
+  poolAdd(a.k,v.trim(),($('#nn',el)||{}).value||'');
+  const cur=S.curCard()||{},cards=S.cards,i=cards.findIndex(function(x){return x.id===cur.id});
+  if(i>=0){cards[i][a.k]=v.trim();S.cards=cards}
+  R.back();R.refresh();toast('已加入並套用')},true);
+ return el};
+
+/* ═════ ② 公開頁頁首 ═════ */
+const _pub43=SCREENS.pubview;
+SCREENS.pubview=(a)=>{
+ const el=_pub43(a);
+ const cards=S.cards;
+ const rebuild=function(){
+  const pv=$('#pv',el);if(!pv)return;
+  const head=pv.firstElementChild;if(!head)return;
+  /* 找目前顯示的是哪一張：用晶片選取狀態，沒有晶片就是目前名片 */
+  let idx=S.cur;
+  const on=$$('[data-i]',pv).find(function(b){return b.style.background.indexOf('var(--ink)')>=0||getComputedStyle(b).backgroundColor==='rgb(30, 30, 30)'});
+  if(on)idx=+on.dataset.i;
+  const c=cards[idx]||S.curCard()||{};
+  const M=MAT[c.material]||MAT.silver, dark=(c.material==='steel'||c.material==='mang');
+  const bg=softBg(c.material,+c.hue||0);
+  const ink=dark?'#F4F4F6':'#191A1C', sub=dark?'rgba(244,244,246,.62)':'rgba(25,26,28,.58)',
+        mut=dark?'rgba(244,244,246,.34)':'rgba(25,26,28,.30)', mk=dark?'rgba(244,244,246,.22)':'rgba(25,26,28,.16)',
+        line=dark?'rgba(244,244,246,.22)':'rgba(25,26,28,.14)';
+  const K=(typeof idKind==='function')?idKind(c):'company';
+  const roleMain=(K==='solo')?(c.title||c.func||''):(c.title||'');
+  const roleSub =(K==='solo')?(c.offer||c.industry||''):(c.company||'');
+  const nm=c.name||'';
+  const big=nm.length>=5?34:nm.length===4?38:44;
+
+  head.outerHTML=
+   '<div style="position:relative;overflow:hidden;padding:24px 22px 22px">'
+   +'<div style="position:absolute;inset:0;background:'+bg.bg+(bg.f?';filter:'+bg.f:'')+'"></div>'
+   +'<div style="position:absolute;inset:0;mix-blend-mode:overlay;opacity:'+(M.gr*0.7)+';background-image:'+GR+'"></div>'
+   +'<div style="position:relative">'
+   /* 頂列：只有一個標記。有 Logo 給 Logo，沒有才給 Heycard */
+   +'<div style="display:flex;align-items:center;min-height:22px;margin-bottom:22px">'
+   +(c.logo
+     ?'<img src="'+esc(c.logo)+'" alt="" style="height:22px;max-width:140px;object-fit:contain;object-position:left center;filter:brightness(0)'+(dark?' invert(1)':'')+';opacity:'+(dark?.88:.8)+'">'
+     :(c.hideBrand?'':'<div style="width:56px;color:'+mk+'">'+LOGO+'</div>'))
+   +'</div>'
+   /* 姓名列：有頭貼就並排 */
+   +'<div style="display:flex;align-items:center;gap:16px">'
+   +(c.photo?'<div class="pf" style="width:64px;height:64px;flex:0 0 auto;box-shadow:0 3px 12px rgba(0,0,0,.18)">'+avatar(0,c.photo,c.name)+'</div>':'')
+   +'<div style="flex:1;min-width:0">'
+   +'<div class="hero" style="font-size:'+big+'px;color:'+ink+'">'+esc(nm)+'</div>'
+   +(c.nameEn?'<div class="lat" style="font-size:11px;letter-spacing:.3em;color:'+sub+';margin-top:10px">'+esc(c.nameEn)+'</div>':'')
+   +'</div></div>'
+   /* 職稱／公司：兩行，主次分明 */
+   +((roleMain||roleSub)?'<div style="margin-top:18px">'
+     +(roleMain?'<div style="font-size:15px;font-weight:700;letter-spacing:-.01em;color:'+ink+'">'+esc(roleMain)+'</div>':'')
+     +(roleSub?'<div style="font-size:13px;color:'+sub+';margin-top:'+(roleMain?3:0)+'px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(roleSub)+'</div>':'')
+     +'</div>':'')
+   /* 一句話介紹：補充，不是第二個標題 */
+   +(c.headline?'<div style="display:flex;gap:12px;margin-top:18px">'
+     +'<i style="width:2px;flex:0 0 auto;border-radius:2px;background:'+line+'"></i>'
+     +'<div style="font-size:14px;line-height:1.75;color:'+sub+';max-width:300px;'
+     +'display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">'+esc(c.headline)+'</div></div>':'')
+   /* 底：標記退到這裡；有 Logo 才需要它，沒有 Logo 上面已經有了 */
+   +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:24px">'
+   +'<div class="ftx" style="flex:1;margin-right:28px;font-size:9px;letter-spacing:.26em;color:'+mut+'"><span>Hey</span><span>to</span><span>Connect</span></div>'
+   +((c.logo&&!c.hideBrand)?'<div style="width:46px;color:'+mk+'">'+LOGO+'</div>':'')
+   +'</div>'
+   +'</div></div>'};
+ setTimeout(rebuild,0);
+ /* 切換身分晶片後原畫面會重畫，跟著再排一次 */
+ el.addEventListener('click',function(e){if(e.target.closest('[data-i]'))setTimeout(rebuild,30)});
+ return el};
 
 /* ═════════ 通知中心 ═════════ */
 SCREENS.notif=()=>screen(tbTitle('通知')
