@@ -7163,8 +7163,8 @@ SCREENS.pubview=(a)=>{
       兩處都要有，不重複——用途不同。
    ② 自我介紹搬出來，白底一段落，叫「關於」。
       15px、行高 1.85、超過四行摺疊成「更多」。長文在白底上才讀得下去。
-   ③ 公司名太長時，頁首用簡稱，全名放到「關於」段落的第一行。
-      （立昇電子 vs 立昇電子股份有限公司——頁首要的是前者）
+   ③ 頁首的公司一律用「公司」欄位原文，允許換到第二行。
+      名片名稱（label）是這張卡的暱稱，只用在切換晶片，不上頁首。
    ④ 職稱和公司允許各自換行，但字級與行高鎖死，
       兩行還是整齊的兩行，不會變成一坨。
    ═══════════════════════════════════════════ */
@@ -7194,8 +7194,9 @@ SCREENS.pubview=(a)=>{
         mut=dark?'rgba(244,244,246,.34)':'rgba(25,26,28,.30)', mk=dark?'rgba(244,244,246,.22)':'rgba(25,26,28,.16)';
   const K=(typeof idKind==='function')?idKind(c):'company';
   const roleMain=(K==='solo')?(c.title||c.func||''):(c.title||'');
-  const coShort=(K==='solo')?(c.offer||c.industry||''):shortCo(c.company||'');
-  const coFull=(K==='solo')?'':(c.company||'');
+  /* 頁首用「公司」欄位原文——不縮寫、不拿名片名稱代替。名片名稱只用在切換晶片。 */
+  const coShort=(K==='solo')?(c.offer||c.industry||''):(c.company||'');
+  const coFull='';
   const nm=c.name||'';
   const big=nm.length>=5?34:nm.length===4?38:44;
 
