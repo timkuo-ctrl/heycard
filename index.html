@@ -4156,7 +4156,7 @@ SCREENS.me=()=>{
   '<div class="tb"><div class="tbi">'
   +'<button id="idsw" style="display:flex;align-items:center;gap:6px;min-width:0">'
   +'<span style="font-size:17px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(cardLabel(cur))+'</span>'
-  +(cards.length>1?ico('arr',16,'var(--ink2)',2.4).replace('<svg','<svg style="transform:rotate(90deg);flex:0 0 auto"'):'')
+  +ico('arr',16,'var(--ink2)',2.4).replace('<svg','<svg style="transform:rotate(90deg);flex:0 0 auto"')
   +'</button>'
   +'<div class="sl r"><button class="ib" data-act="settings">'+ico('gear',21,'var(--ink)')+'</button></div>'
   +'</div></div>'
@@ -4195,8 +4195,9 @@ SCREENS.me=()=>{
   +TIER_AI.map(function(f){return tierRow(cur,f)}).join('')
   +'</div>'+navBar())};
 
+/* 只有一張名片時也要開得了——「建立新名片」就住在這張清單裡 */
 document.addEventListener('click',function(e){
- if(e.target.closest('#idsw')&&S.cards.length>1)openIdentity()});
+ if(e.target.closest('#idsw'))openIdentity()});
 
 /* ═════════ 已交換：只留當下要看的 ═════════ */
 SCREENS.exchanged=(a)=>{
