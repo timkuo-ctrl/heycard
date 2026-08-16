@@ -3811,8 +3811,11 @@ SCREENS.aiDesign=()=>{
   if(tab==='hue')h='<div style="display:flex;flex-wrap:wrap;gap:12px">'
    +HUES.map(function(x){
      const on=d.hue===x;
-     return '<button data-hue="'+x+'" style="width:52px;height:52px;border-radius:14px;background:'+MAT[d.material].bg+';'
-     +(x?'filter:hue-rotate('+x+'deg) saturate(1.1);':'')+(on?'box-shadow:0 0 0 2px var(--mang),0 0 0 4px #fff inset':'border:1px solid var(--e6)')+'"></button>'}).join('')
+     const grey=/^(silver|mist|steel)$/.test(d.material);
+     /* 灰階材質用上色疊層預覽，跟卡片本身同一套邏輯 */
+     const bgc=(grey&&x)?'linear-gradient(hsl('+x+' 72% '+(d.material==='steel'?'46':'62')+'% / '+(d.material==='steel'?'.34':'.28')+'),hsl('+x+' 72% '+(d.material==='steel'?'46':'62')+'% / '+(d.material==='steel'?'.34':'.28')+')),'+MAT[d.material].bg:MAT[d.material].bg;
+     return '<button data-hue="'+x+'" style="width:52px;height:52px;border-radius:14px;background:'+bgc+';'
+     +((x&&!grey)?'filter:hue-rotate('+x+'deg) saturate(1.1);':'')+(on?'box-shadow:0 0 0 2px var(--mang),0 0 0 4px #fff inset':'border:1px solid var(--e6)')+'"></button>'}).join('')
    +'</div>'
    +'<div style="margin-top:20px"><input id="hs" type="range" min="0" max="350" step="5" value="'+d.hue+'" style="width:100%"></div>';
   if(tab==='lay')h=Object.keys(LAYOUTS).map(function(L){
@@ -5925,6 +5928,8 @@ function cardHTML(c,w,o){
 
  return '<div class="card" style="width:'+w+'px;height:'+H+'px;border-radius:'+z(16)+'px;box-shadow:'+(o.flat?'0 1px 3px rgba(0,0,0,.18)':'var(--shc)')+(M.font?';font-family:'+M.font:'')+'">'
  +'<div style="position:absolute;inset:0;background:'+M.bg+(hue?';filter:hue-rotate('+hue+'deg) saturate(1.1)':'')+'"></div>'
+ /* 灰階材質轉色相沒有反應（灰沒有色相可轉），改用「上色」疊層讓色調真的看得見 */
+ +((hue&&/^(silver|mist|steel)$/.test(c.material||'silver'))?'<div style="position:absolute;inset:0;background:hsl('+hue+' 72% '+(c.material==='steel'?'46':'62')+'% / '+(c.material==='steel'?'.34':'.28')+');mix-blend-mode:color;pointer-events:none"></div>':'')
  +'<div class="g" style="background:'+M.sh+'"></div><div class="gr" style="opacity:'+M.gr+';background-image:'+GR+'"></div>'
  +'<div class="ed" style="border-radius:'+z(16)+'px"></div>'
  +'<div style="position:relative;height:100%;padding:'+z(24)+'px '+z(23)+'px;display:flex;flex-direction:column'+(ctr?';text-align:center;align-items:center':'')+'">'
@@ -7209,6 +7214,7 @@ SCREENS.pubview=(a)=>{
   head.outerHTML=
    '<div style="position:relative;overflow:hidden;padding:24px 22px 22px'+fontCSS+'">'
    +'<div style="position:absolute;inset:0;background:'+bg.bg+(bg.f?';filter:'+bg.f:'')+'"></div>'
+   +(((+c.hue||0)&&/^(silver|mist|steel)$/.test(c.material||'silver'))?'<div style="position:absolute;inset:0;background:hsl('+(+c.hue)+' 72% '+(c.material==='steel'?'46':'62')+'% / '+(c.material==='steel'?'.34':'.28')+');mix-blend-mode:color;pointer-events:none"></div>':'')
    +'<div style="position:absolute;inset:0;mix-blend-mode:overlay;opacity:'+(M.gr*0.7)+';background-image:'+GR+'"></div>'
    +'<div style="position:relative">'
    +'<div style="display:flex;align-items:center;justify-content:space-between;min-height:22px;margin-bottom:22px">'
@@ -7421,6 +7427,8 @@ SCREENS.aiDesign=()=>{
   const P=e.target.closest('[data-lp]');if(P)d.logoPos=P.dataset.lp;
   const hu=e.target.closest('[data-hue]');if(hu)d.hue=+hu.dataset.hue;
   if(m||L||P||hu)setTimeout(preview,0);
+  /* 原本的 draw() 會整列重畫分頁，我們加的兩顆要補回去 */
+  setTimeout(addTabs,0);
   const t=e.target.closest('[data-dt]');
   if(t&&(t.dataset.dt==='ink'||t.dataset.dt==='font')){
    e.stopPropagation();
@@ -7439,6 +7447,10 @@ SCREENS.aiDesign=()=>{
     const cards=S.cards,i=cards.findIndex(function(x){return x.id===cur.id});
     if(i>=0){cards[i].ink=d.ink||'';cards[i].font=d.font||'modern';S.cards=cards;R.refresh()}},0)}
  },true);
+ el.addEventListener('preset',function(e){
+  const p=e.detail||{};
+  d.material=p.material||d.material;d.layout=p.layout||d.layout;d.logoPos=p.logoPos||d.logoPos;d.hue=+p.hue||0;
+  d.ink=p.ink||'';d.font=p.font||'modern';setTimeout(preview,0)});
  el.addEventListener('input',function(e){
   if(e.target.id==='hs'){d.hue=+e.target.value;setTimeout(preview,0)}
   if(e.target.id==='inkPick'){d.ink=e.target.value;preview();
@@ -7475,6 +7487,39 @@ SCREENS.pubview=(a)=>{
   /* 塞進功能清單容器的最後一項（容器的 </div> 緊接著按鈕） */
   return html.replace('</div><button data-sub="pro"',extra+'</div><button data-sub="pro"')}
 })();
+
+/* ═════ 款式 vs 材質：讓「款式」真的是整套風格 ═════
+   原本十個款式裡有五個就是五種材質的預設值，跟「材質」分頁重複，
+   當然看不出差別。款式現在是「材質＋色調＋版式＋字色＋字體」的整套搭配，
+   每一個都跟單選材質長得不一樣。 */
+PRESETS.length=0;
+[
+ {n:'銀霧',  material:'silver',hue:0,  layout:'classic',logoPos:'top',   ink:'',       font:'modern'},
+ {n:'曜黑',  material:'steel', hue:0,  layout:'classic',logoPos:'top',   ink:'',       font:'modern'},
+ {n:'極光',  material:'aurora',hue:0,  layout:'center', logoPos:'top',   ink:'',       font:'light'},
+ {n:'錳藍',  material:'mang',  hue:0,  layout:'center', logoPos:'top',   ink:'',       font:'light'},
+ {n:'玫瑰金',material:'silver',hue:330,layout:'classic',logoPos:'bottom',ink:'#6B4A2E',font:'classic'},
+ {n:'香檳',  material:'silver',hue:42, layout:'center', logoPos:'top',   ink:'#162A56',font:'classic'},
+ {n:'墨綠',  material:'steel', hue:128,layout:'minimal',logoPos:'top',   ink:'#D9B86A',font:'modern'},
+ {n:'湖水',  material:'mist',  hue:182,layout:'center', logoPos:'top',   ink:'#162A56',font:'light'},
+ {n:'暮紫',  material:'aurora',hue:40, layout:'classic',logoPos:'bottom',ink:'#FFFFFF',font:'light'},
+ {n:'典藏',  material:'mist',  hue:0,  layout:'classic',logoPos:'top',   ink:'#0F0F14',font:'classic'}
+].forEach(function(p){PRESETS.push(p)});
+
+/* 款式帶字色／字體時，也要寫進設計器狀態；免費用戶碰到付費款式先看方案 */
+const _design45b=SCREENS.aiDesign;
+SCREENS.aiDesign=()=>{
+ const el=_design45b();
+ el.addEventListener('click',function(e){
+  const ps=e.target.closest('[data-ps]');if(!ps)return;
+  const p=PRESETS[+ps.dataset.ps];if(!p)return;
+  const needPro=!!(p.ink||(p.font&&p.font!=='modern'));
+  const needPlus=!!p.hue;
+  if(needPro&&!isPro()){e.stopPropagation();e.preventDefault();paywall('pro','「'+p.n+'」用到了字色與字體，是 Pro 的款式。');return}
+  if(needPlus&&!isPlus()){e.stopPropagation();e.preventDefault();paywall('plus','「'+p.n+'」用到了色調，是 Plus 的款式。');return}
+  /* 讓 _screens45 那層的 d 也吃到 ink/font：透過自訂事件通知 */
+  el.dispatchEvent(new CustomEvent('preset',{detail:p}))},true);
+ return el};
 
 /* ═════════ 通知中心 ═════════ */
 SCREENS.notif=()=>screen(tbTitle('通知')
