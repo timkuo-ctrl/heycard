@@ -6896,25 +6896,11 @@ aiAnswerHTML=function(q){
   +(isPro()?'':'　·　<button data-act="goPlans" style="color:var(--mang);font-weight:700">升級 Pro</button>')+'</div>':'';
  return html.replace(/<\/div>\s*$/,'')+hint+'</div>'};
 
-/* ═════ 鎖點 ③：名片去標與配色 ═════ */
+/* ═════ 鎖點 ③（v3.0 移到 _screens48：付費選項可試、套用時才升級）═════ */
 document.addEventListener('click',function(e){
- const b=e.target.closest('[data-brand]');
- if(b&&!isPlus()){e.stopPropagation();e.preventDefault();
-  paywall('plus','拿掉名片上的 Heycard 標記，是 Plus 的功能。');return}
- const hu=e.target.closest('[data-hue]');
- const dt=e.target.closest('[data-dt="hue"]');
- if((hu||dt)&&!isPlus()){
-  if(hu&&+hu.dataset.hue===0)return;   /* 回到原色不算 */
-  e.stopPropagation();e.preventDefault();
-  paywall('plus','自由配色是 Plus 的功能。材質與版式維持免費。');return}
  const a=e.target.closest('[data-act="goPlans"]');
  if(a){R.go('plans',{},'push')}
 },true);
-
-/* 設計器色調滑桿也要鎖 */
-document.addEventListener('input',function(e){
- if(e.target.id==='hs'&&!isPlus()){e.target.value=0;e.stopPropagation();
-  paywall('plus','自由配色是 Plus 的功能。')}},true);
 
 /* ═════ 設定：訂閱狀態 ═════ */
 const _set41=SCREENS.settings;
@@ -7496,8 +7482,8 @@ PRESETS.length=0;
 [
  {n:'銀霧',  material:'silver',hue:0,  layout:'classic',logoPos:'top',   ink:'',       font:'modern'},
  {n:'曜黑',  material:'steel', hue:0,  layout:'classic',logoPos:'top',   ink:'',       font:'modern'},
- {n:'極光',  material:'aurora',hue:0,  layout:'center', logoPos:'top',   ink:'',       font:'light'},
- {n:'錳藍',  material:'mang',  hue:0,  layout:'center', logoPos:'top',   ink:'',       font:'light'},
+ {n:'極光',  material:'aurora',hue:0,  layout:'center', logoPos:'top',   ink:'',       font:'modern'},
+ {n:'錳藍',  material:'mang',  hue:0,  layout:'minimal',logoPos:'top',   ink:'',       font:'modern'},
  {n:'玫瑰金',material:'silver',hue:330,layout:'classic',logoPos:'bottom',ink:'#6B4A2E',font:'classic'},
  {n:'香檳',  material:'silver',hue:42, layout:'center', logoPos:'top',   ink:'#162A56',font:'classic'},
  {n:'墨綠',  material:'steel', hue:128,layout:'minimal',logoPos:'top',   ink:'#D9B86A',font:'modern'},
@@ -7520,6 +7506,1264 @@ SCREENS.aiDesign=()=>{
   /* 讓 _screens45 那層的 d 也吃到 ink/font：透過自訂事件通知 */
   el.dispatchEvent(new CustomEvent('preset',{detail:p}))},true);
  return el};
+/* ═══════════════════════════════════════════
+   v3.0 ㊱：Web 殼層 ＋ 全站視覺收斂
+   ─────────────────────────────────────────
+   ① Web（≥ 900px）採 Instagram 式殼層：左側直欄導覽、中間一欄內容
+      （最寬 600px），≥ 1360px 右側多一條「我的名片／方案」側欄。
+      畫面本身完全不變——同一套 SCREENS，同一個路由，同一份資料。
+      只有殼層不同：手機底部 5 格 → 桌機左側直欄。
+   ② 全站視覺收斂：段落間距、圓角、列高、晶片形狀統一；
+      標題字重、次要文字字級收攏，讓每頁比例一致。
+   ③ 付費層級的視覺語言：PLUS／PRO 兩個小徽章（tierPill），
+      全站同一個長相，看到就知道「這是升級後的」。
+   ═══════════════════════════════════════════ */
+
+(function(){
+ const st=document.createElement('style');
+ st.textContent=`
+/* ── 全站收斂 ── */
+.sec{margin:32px 0 14px}
+.sec b{font-size:15px}
+.pl{border-radius:16px}
+.chip{border-radius:99px;padding:7px 13px}
+.row{padding:11px 0}
+.rt .n{font-size:14.5px}
+.rt .s{font-size:12px;margin-top:2px}
+.tb .tt{font-size:16.5px}
+.btn{border-radius:12px;padding:14px 20px}
+.btn.sm{border-radius:10px}
+.tabs{gap:22px}
+.tab{padding:12px 2px;font-size:14px}
+.nv span{font-size:9.5px}
+
+/* ── 付費徽章 ── */
+.tp{display:inline-flex;align-items:center;gap:4px;font-family:var(--fe);font-size:9.5px;font-weight:800;letter-spacing:.08em;padding:3px 7px;border-radius:99px;line-height:1;vertical-align:middle;flex:0 0 auto}
+.tp.plus{background:#EEEEFF;color:#4646E0}
+.tp.pro{background:linear-gradient(135deg,#2B2B36,#0F0F14);color:#F2E7C0}
+.tp.lock svg{width:9px;height:9px}
+.tp.on{background:var(--turqS);color:var(--turqD)}
+
+/* ── 桌機殼層 ── */
+#side,#rail{display:none}
+@media(min-width:900px){
+ body{background:#fff}
+ #app{align-items:stretch;justify-content:flex-start}
+ #dev{max-width:none;max-height:none;width:100%;height:100%;border-radius:0!important;box-shadow:none!important;background:#fff}
+ #dev:before{display:none!important}
+ #dev>.scr{left:244px;right:0;width:auto;background:#FAFAFB}
+ #dev>.scr>*{max-width:600px;margin-left:auto!important;margin-right:auto!important;width:100%}
+ #dev>.scr{align-items:stretch}
+ #dev>.scr:after{content:'';position:absolute;top:0;bottom:0;left:50%;width:600px;transform:translateX(-50%);border-left:1px solid var(--hair);border-right:1px solid var(--hair);pointer-events:none;background:#fff;z-index:0}
+ #dev>.scr>*{position:relative;z-index:1}
+ #dev>.scr .nav{display:none}
+ #sbar{display:none}
+ :root{--sat:6px;--sab:16px}
+ .scr.push{animation:none}
+ .scr.modal{animation:none}
+ .sheet{left:244px}
+ .sheet .sbx{max-width:600px;margin:0 auto;width:100%;border-radius:24px 24px 0 0}
+ .toast{left:calc(244px + (100% - 244px)/2)}
+ #side{display:flex;flex-direction:column;position:absolute;top:0;left:0;bottom:0;width:244px;border-right:1px solid var(--hair);background:#fff;padding:26px 14px 18px;z-index:120}
+ #side .lg{width:96px;color:var(--ink);margin:6px 0 30px 12px}
+ #side .sn{display:flex;align-items:center;gap:14px;padding:12px 12px;border-radius:12px;font-size:15px;color:var(--ink);width:100%;text-align:left;transition:background .12s}
+ #side .sn:hover{background:#F2F2F5}
+ #side .sn.on{font-weight:800}
+ #side .sn .ic{width:26px;height:26px;display:flex;align-items:center;justify-content:center}
+ #side .sn.cam .ic{background:var(--ink);border-radius:9px;color:#fff}
+ #side .sp{flex:1}
+ #side .up{margin:8px 4px 10px;padding:14px;border-radius:16px;background:linear-gradient(135deg,#1C1C24,#0F0F14);color:#fff}
+ #side .up b{display:block;font-size:14px;letter-spacing:-.01em}
+ #side .up span{display:block;font-size:12px;color:rgba(255,255,255,.62);margin-top:3px;line-height:1.6}
+ #side .up .btn{margin-top:12px;padding:10px;font-size:13px;background:#fff;color:#111}
+}
+@media(min-width:1360px){
+ #rail{display:block;position:absolute;top:0;right:0;bottom:0;width:calc((100% - 244px - 600px)/2);padding:32px 24px;z-index:110;pointer-events:none}
+ #rail>*{pointer-events:auto}
+ #rail .rc{max-width:200px;margin:0 auto}
+ #rail .cardw{border-radius:14px;overflow:hidden;box-shadow:var(--shc)}
+ #rail .rn{font-size:15px;font-weight:800;margin-top:16px;letter-spacing:-.01em}
+ #rail .rs{font-size:12.5px;color:var(--ink3);margin-top:2px}
+ #rail .rl{display:flex;gap:8px;margin-top:14px}
+ #rail .rl .btn{padding:10px 12px;font-size:12.5px;border-radius:10px}
+ #rail .pm{margin-top:26px;padding:16px;border-radius:16px;border:1px solid var(--e6);background:#fff}
+ #rail .pm .t{font-size:13.5px;font-weight:700}
+ #rail .pm .s{font-size:12px;color:var(--ink3);margin-top:4px;line-height:1.7}
+}
+`;
+ document.head.appendChild(st)})();
+
+/* 徽章：全站唯一的付費標記 */
+function tierPill(t,opt){
+ opt=opt||{};
+ const lock='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+ const has=(t==='pro')?(typeof isPro==='function'&&isPro()):(typeof isPlus==='function'&&isPlus());
+ if(has&&opt.hideWhenOwned)return '';
+ return '<span class="tp '+t+(has?' on':' lock')+'">'+(has?'':lock)+(t==='pro'?'PRO':'PLUS')+'</span>'}
+
+/* ═════ 桌機殼層：左欄導覽 ＋ 右欄我的名片 ═════ */
+function shellHTML(){
+ const T=[['seek','尋求','seek'],['net','人脈','grid'],['msg','訊息','msg'],['me','名片','idc']];
+ const items=T.map(function(t){
+  const on=(typeof TAB!=='undefined'&&TAB===t[0]);
+  return '<button class="sn'+(on?' on':'')+'" data-tab="'+t[0]+'"><span class="ic">'+ico(t[2],24,on?'var(--ink)':'#3A3A44')+'</span>'+t[1]+'</button>'});
+ const p=(typeof plan==='function')?plan():'free';
+ const up=p==='pro'?'':(p==='plus'
+  ?'<div class="up"><b>讓人脈會思考</b><span>洞察全開、AI 搜尋 200 次／月、年繳送 NFC 卡</span><button class="btn" data-go="plans">看 Pro</button></div>'
+  :'<div class="up"><b>名片是你的</b><span>拿掉 Heycard 標記、自由配色，NT$79／月起</span><button class="btn" data-go="plans">看方案</button></div>');
+ return '<div class="lg">'+LOGO+'</div>'
+  +items.slice(0,2).join('')
+  +'<button class="sn cam" data-act="camera"><span class="ic">'+ico('cam',18,'#fff')+'</span>拍名片</button>'
+  +items.slice(2).join('')
+  +'<div class="sp"></div>'+up
+  +'<button class="sn" data-go="settings"><span class="ic">'+ico('gear',22,'#3A3A44')+'</span>設定</button>'}
+
+function railHTML(){
+ const c=(typeof S!=='undefined'&&S.curCard&&S.curCard())||null;
+ if(!c)return '';
+ const p=(typeof plan==='function')?plan():'free';
+ return '<div class="rc">'
+  +'<div class="cardw">'+cardHTML(c,200,{d:0})+'</div>'
+  +'<div class="rn">'+esc(c.name||'')+'</div>'
+  +'<div class="rs">'+esc([c.title,c.company].filter(Boolean).join(' · '))+'</div>'
+  +'<div class="rl"><button class="btn tt" data-go="aiDesign">設計</button><button class="btn tt" data-go="share">分享</button><button class="btn tt" data-go="pubview">公開頁</button></div>'
+  +(p==='free'?'<div class="pm"><div class="t">升級 Plus '+tierPill('plus')+'</div><div class="s">拿掉名片上的 Heycard 標記、自由配色。你的名片，只有你的品牌。</div><button class="btn sm" data-go="plans" style="margin-top:12px">NT$79／月起</button></div>'
+   :p==='plus'?'<div class="pm"><div class="t">升級 Pro '+tierPill('pro')+'</div><div class="s">洞察全開、AI 搜尋 ×10、字色與字體，年繳送 NFC 卡。</div><button class="btn sm" data-go="plans" style="margin-top:12px">NT$179／月起</button></div>'
+   :'<div class="pm"><div class="t">Pro '+tierPill('pro')+'</div><div class="s">全部功能已開。感謝你讓人脈會思考。</div></div>')
+  +'</div>'}
+
+function renderShell(){
+ const dev=$('#dev');if(!dev)return;
+ let side=$('#side'),rail=$('#rail');
+ if(!side){side=h('<div id="side"></div>');dev.appendChild(side)}
+ if(!rail){rail=h('<div id="rail"></div>');dev.appendChild(rail)}
+ const authed=!!(S.user&&S.cards.length);
+ side.style.display=authed?'':'none';rail.style.display=authed?'':'none';
+ if(!authed)return;
+ side.innerHTML=shellHTML();
+ try{rail.innerHTML=railHTML()}catch(e){rail.innerHTML=''}}
+
+/* 路由每動一次，殼層跟著更新（Tab 高亮、名片預覽、方案狀態） */
+(function(){
+ ['go','back','reset','replace','refresh'].forEach(function(k){
+  const f=R[k];R[k]=function(){const r=f.apply(R,arguments);setTimeout(renderShell,0);return r}});
+ setTimeout(renderShell,0);
+ window.addEventListener('resize',function(){setTimeout(renderShell,0)})})();
+
+/* 未登入畫面在桌機置中成單欄（沒有側欄） */
+(function(){
+ const st=document.createElement('style');
+ st.textContent='@media(min-width:900px){#dev.noauth>.scr{left:0;right:0}#dev.noauth>.scr:after{left:50%;right:auto;transform:translateX(-50%)}#dev.noauth>.scr>*{margin-left:auto!important;margin-right:auto!important}}';
+ document.head.appendChild(st);
+ const f=renderShell;renderShell=function(){f();const dev=$('#dev');if(dev)dev.classList.toggle('noauth',!(S.user&&S.cards.length))}})();
+/* ═══════════════════════════════════════════
+   v3.0 ㊲：拍自己的名片（正面／反面）＋ 相機自動判斷橫直向
+   ─────────────────────────────────────────
+   ① 註冊／建卡流程原本「拍我的實體名片」直接跳去手動輸入，工程師不知道
+      要做什麼。現在補齊：拍正面 → 拍反面（可略過）→ 辨識 → 帶入編輯頁。
+   ② 相機開啟時自動判斷名片是橫的還是直的：取景框跟著轉，提示一句。
+      原型用模擬（開框 700ms 後判為橫向）；正式版：
+      · 有影像串流時，每 300ms 取一幀做邊緣偵測 → 最大四邊形 bbox；
+        寬/高 ≥ 1.2 → 橫向，≤ 0.83 → 直向，其餘維持上一個判斷（去抖）。
+      · 沒有偵測結果前預設橫向（九成名片是橫的）。
+      · 使用者可手動按「旋轉」覆蓋，之後不再自動改。
+   ③ 收名片相機（camera）共用同一個取景框元件。
+   ═══════════════════════════════════════════ */
+
+/* 取景框：一個元件，兩個相機都用 */
+function camFrameHTML(orient,label,captured){
+ const land=orient!=='port';
+ const w=land?'80%':'52%';
+ return '<div id="cfw" style="position:absolute;top:44%;left:50%;transform:translate(-50%,-50%);width:'+w+';aspect-ratio:'+(land?'1.586/1':'1/1.586')+';z-index:4;transition:width .32s cubic-bezier(.2,.8,.2,1),aspect-ratio .32s cubic-bezier(.2,.8,.2,1)">'
+  +'<div id="cf" style="position:absolute;inset:0;border-radius:14px;box-shadow:0 0 0 2px rgba(255,255,255,.92),0 0 0 4000px rgba(10,10,14,.5);overflow:hidden">'
+  +(captured?'<div style="position:absolute;inset:0;background:'+captured+'"></div><div style="position:absolute;right:10px;top:10px;width:24px;height:24px;border-radius:99px;background:var(--turq);display:flex;align-items:center;justify-content:center">'+ico('ck',13,'#fff',3)+'</div>':'')
+  +['top:10px;left:10px;border-width:2px 0 0 2px','top:10px;right:10px;border-width:2px 2px 0 0','bottom:10px;left:10px;border-width:0 0 2px 2px','bottom:10px;right:10px;border-width:0 2px 2px 0']
+    .map(function(s){return '<i style="position:absolute;width:18px;height:18px;border:0 solid rgba(255,255,255,.95);'+s+'"></i>'}).join('')
+  +'</div>'
+  +'<div id="cfl" style="position:absolute;top:calc(100% + 18px);left:-40%;right:-40%;text-align:center;z-index:5">'
+  +'<span style="font-size:12px;color:rgba(255,255,255,.85);background:rgba(10,10,14,.5);padding:6px 12px;border-radius:99px;backdrop-filter:blur(6px);white-space:nowrap">'+label+'</span></div>'
+  +'</div>'}
+(function(){const st=document.createElement('style');st.textContent='@keyframes fup{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}';document.head.appendChild(st)})();
+
+/* 模擬的自動判斷：正式版換成邊緣偵測（見檔頭） */
+function detectOrient(el,cb){
+ const t=setTimeout(function(){if(!el.isConnected||el._manual)return;cb('land')},700);
+ el._detT=t}
+
+/* ═════ 拍自己的名片：正面 → 反面 → 辨識 ═════ */
+SCREENS.camMine=(a)=>{
+ a=a||{};
+ const st={step:'front',orient:'land',front:null,back:null};
+ const el=screen('<div class="body" style="background:#141418;position:relative;overflow:hidden">'
+ +'<div id="stage" style="position:absolute;inset:0;background:linear-gradient(170deg,#33333A,#141418)"></div>'
+ +'<video id="vid" playsinline muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none"></video>'
+ +'<div style="position:absolute;top:calc(var(--sat) + 10px);left:14px;right:14px;display:flex;justify-content:space-between;align-items:center;z-index:6">'
+ +'<button class="ib" data-act="back" style="background:rgba(255,255,255,.15)">'+ico('x',18,'#fff')+'</button>'
+ +'<div id="steps" style="display:flex;gap:6px;align-items:center"></div>'
+ +'<button class="ib" id="camOn" style="background:rgba(255,255,255,.15);width:auto;padding:0 12px;font-size:11px;color:#fff;gap:6px">'+ico('cam',15,'#fff')+'開相機</button></div>'
+ +'<div id="frame"></div>'
+ +'<div id="hint" style="position:absolute;top:calc(var(--sat) + 64px);left:0;right:0;text-align:center;z-index:6;pointer-events:none"></div>'
+ +'<div id="ctl" style="position:absolute;bottom:calc(22px + var(--sab));left:0;right:0;z-index:6"></div>'
+ +'</div>');
+
+ const steps=function(){
+  $('#steps',el).innerHTML=[['front','正面'],['back','反面']].map(function(s){
+   const done=(s[0]==='front'&&st.front)||(s[0]==='back'&&st.back);
+   const on=st.step===s[0];
+   return '<span style="display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:'+(on?700:400)+';color:'+(on?'#fff':'rgba(255,255,255,.55)')+'">'
+    +'<i style="width:7px;height:7px;border-radius:99px;background:'+(done?'var(--turq)':on?'#fff':'rgba(255,255,255,.35)')+'"></i>'+s[1]+'</span>'}).join('<i style="width:14px;height:1px;background:rgba(255,255,255,.3)"></i>')};
+
+ const draw=function(){
+  steps();
+  const shot=st.step==='front'?st.front:st.back;
+  const label=shot?(st.step==='front'?'正面拍好了':'反面拍好了')
+   :(st.step==='front'?'把名片正面放進框裡':'翻面，拍反面（沒有可以略過）');
+  $('#frame',el).innerHTML=camFrameHTML(st.orient,label,shot);
+  $('#ctl',el).innerHTML=shot
+   ?'<div style="display:flex;gap:10px;padding:0 24px"><button class="btn gh" id="retake" style="flex:1;background:rgba(255,255,255,.12);border-color:transparent;color:#fff">重拍</button>'
+     +'<button class="btn" id="next" style="flex:1.4">'+(st.step==='front'?'下一步：拍反面':'開始辨識')+'</button></div>'
+   :'<div style="display:flex;align-items:center;justify-content:space-between;padding:0 28px">'
+     +'<button id="rot" style="width:52px;display:flex;flex-direction:column;align-items:center;gap:4px;color:#fff;font-size:10px">'
+     +'<span style="width:38px;height:38px;border-radius:99px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center">'+ico('swap',18,'#fff')+'</span>旋轉</button>'
+     +'<button id="shut" style="width:66px;height:66px;border-radius:99px;border:3px solid rgba(255,255,255,.9);display:flex;align-items:center;justify-content:center"><div style="width:54px;height:54px;border-radius:99px;background:#fff"></div></button>'
+     +(st.step==='back'?'<button id="skip" style="width:52px;text-align:right;font-size:14px;font-weight:700;color:#fff">略過</button>':'<span style="width:52px"></span>')
+     +'</div>'};
+
+ const hint=function(msg){
+  const hd=$('#hint',el);
+  hd.innerHTML='<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#fff;background:rgba(92,92,255,.92);padding:7px 12px;border-radius:99px;animation:fup .24s both">'+ico('ck',12,'#fff',3)+esc(msg)+'</span>';
+  setTimeout(function(){if(hd.firstChild){hd.firstChild.style.transition='opacity .3s';hd.firstChild.style.opacity='0'}},1800)};
+
+ /* 自動判斷：一進來先假設橫向偵測中，700ms 後確認 */
+ st.orient='port';draw();
+ detectOrient(el,function(o){st.orient=o;draw();hint('偵測到橫向名片，取景框已轉向')});
+
+ el.addEventListener('click',async function(e){
+  if(e.target.closest('#camOn')){
+   try{const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const v=$('#vid',el);v.srcObject=s;v.style.display='block';await v.play();
+    $('#stage',el).style.display='none';$('#camOn',el).style.display='none';el._stream=s}
+   catch(err){toast('無法開啟相機，改用模擬拍攝')}
+   return}
+  if(e.target.closest('#rot')){el._manual=1;st.orient=st.orient==='land'?'port':'land';draw();return}
+  if(e.target.closest('#shut')){
+   const fl=h('<div style="position:absolute;inset:0;background:#fff;z-index:20"></div>');el.appendChild(fl);
+   setTimeout(function(){fl.style.transition='opacity .22s';fl.style.opacity='0';setTimeout(function(){fl.remove()},240)},40);
+   const tex=st.step==='front'?'linear-gradient(160deg,#F4F4F6,#CFCFD5)':'linear-gradient(160deg,#2C2C33,#15151A)';
+   if(st.step==='front')st.front=tex;else st.back=tex;
+   setTimeout(draw,120);return}
+  if(e.target.closest('#retake')){if(st.step==='front')st.front=null;else st.back=null;draw();return}
+  if(e.target.closest('#skip')){st.back=null;proc();return}
+  if(e.target.closest('#next')){
+   if(st.step==='front'){st.step='back';draw();return}
+   proc();return}
+ });
+
+ /* 辨識：進度 → 帶入編輯頁 */
+ const proc=function(){
+  stopCam(el);
+  $('#frame',el).innerHTML='';$('#ctl',el).innerHTML='';$('#hint',el).innerHTML='';
+  const box=h('<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:8;color:#fff;padding:0 40px;text-align:center">'
+   +'<div style="display:flex;gap:10px;margin-bottom:26px">'
+   +'<div style="width:96px;aspect-ratio:1.586/1;border-radius:8px;background:'+(st.front||'#333')+'"></div>'
+   +(st.back?'<div style="width:96px;aspect-ratio:1.586/1;border-radius:8px;background:'+st.back+'"></div>':'')+'</div>'
+   +'<div style="font-size:16px;font-weight:700;letter-spacing:-.01em">正在辨識中英文與欄位</div>'
+   +'<div style="font-size:12.5px;color:rgba(255,255,255,.6);margin-top:6px">辨識完可以逐欄確認，改到對為止</div>'
+   +'<div class="prog" style="width:160px;margin-top:22px;background:rgba(255,255,255,.18)"><i id="pg" style="width:8%"></i></div></div>');
+  el.appendChild(box);
+  setTimeout(function(){const p=$('#pg',el);if(p)p.style.width='100%'},60);
+  setTimeout(function(){
+   const p=SCAN_POOL[0];
+   const pre={name:p.name,nameEn:p.nameEn,title:p.title,company:p.company,tel:p.tel,email:p.email};
+   R.replace('cardEdit',{canBack:1,prefill:pre,fromScan:1})},1500)};
+ return el};
+
+/* 建卡方式頁：「拍我的實體名片」→ 真的去拍 */
+document.addEventListener('click',function(e){
+ const b=e.target.closest('[data-act="scanMine"]');if(!b)return;
+ e.stopPropagation();e.preventDefault();
+ R.go('camMine',{},'modal')},true);
+
+/* 編輯頁吃 prefill：欄位帶入 ＋ 一條「辨識帶入」提示 */
+const _ce47=SCREENS.cardEdit;
+SCREENS.cardEdit=(a)=>{
+ const el=_ce47(a);
+ if(!a||!a.prefill)return el;
+ setTimeout(function(){
+  Object.keys(a.prefill).forEach(function(k){
+   const inp=$('[data-k="'+k+'"]',el);if(!inp||!a.prefill[k])return;
+   inp.value=a.prefill[k];inp.dispatchEvent(new Event('input',{bubbles:true}))});
+  const flds=$('#flds',el);
+  if(flds&&!$('#scanNote',el))flds.parentNode.insertBefore(h('<div id="scanNote" style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:12px;background:var(--turqS);color:var(--turqD);font-size:12.5px;margin-bottom:12px">'
+   +ico('ck',14,'currentColor',2.8)+'<span>已從名片辨識帶入，看一眼有沒有錯字</span></div>'),flds)},60);
+ return el};
+
+/* 收名片相機：換成同一個會轉向的取景框 */
+const _cam47=SCREENS.camera;
+SCREENS.camera=()=>{
+ const el=_cam47();
+ const patch=function(){
+  if(CAMMODE!=='card')return;
+  const fr=$('#frame',el);if(!fr)return;
+  const label=(fr.textContent||'').trim()||'把名片放進框裡';
+  fr.innerHTML=camFrameHTML(el._orient||'port',label,null)};
+ setTimeout(patch,0);
+ detectOrient(el,function(o){el._orient=o;patch();
+  const hd=h('<div style="position:absolute;top:calc(var(--sat) + 64px);left:0;right:0;text-align:center;z-index:6;pointer-events:none"><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#fff;background:rgba(92,92,255,.92);padding:7px 12px;border-radius:99px;animation:fup .24s both">'+ico('ck',12,'#fff',3)+'偵測到橫向名片</span></div>');
+  el.appendChild(hd);setTimeout(function(){hd.style.transition='opacity .3s';hd.style.opacity='0';setTimeout(function(){hd.remove()},320)},1800)});
+ el.addEventListener('click',function(e){if(e.target.closest('[data-mode]'))setTimeout(patch,0)});
+ return el};
+/* ═══════════════════════════════════════════
+   v3.0 ㊳：付費動線——看得見、摸得到、升級了才帶走
+   ─────────────────────────────────────────
+   原則：
+   ① 免費的先好用；付費的「看得見、試得到」，但要升級才能帶走。
+      設計器裡的 Plus／Pro 選項全部可以點、預覽會即時套在你自己的名片上——
+      這就是期待感的來源：先看到自己名片變好看，再決定要不要。
+   ② 分層一眼分得出來：分頁列用細線把「免費｜PLUS｜PRO」分成三段，
+      付費分頁掛徽章；款式磁磚右上角也掛徽章。
+   ③ 全站唯一的升級入口：upsell() 底部面板——你的名片「現在 → 升級後」
+      並排、三行好處、一顆按鈕。paywall() 一律轉進 upsell()。
+   ④ 方案頁重做：上方是「你的名片，升級之後」——切 Free／Plus／Pro，
+      預覽用的是你自己的名片；下方年繳／月繳、一顆 CTA、精簡的比較表。
+   ⑤ 付款在網頁完成（避開 App Store 抽成）：CTA 進 checkout 畫面
+      （heycard.app 安全付款頁的樣子），付完回 App 開通。
+   ═══════════════════════════════════════════ */
+
+/* ═════ 工具 ═════ */
+function planPrice(key,cycle){const P=PLANS[key];return cycle==='y'?Math.round(P.price*10):P.price}
+function priceText(key,cycle){return 'NT$'+planPrice(key,cycle).toLocaleString()+(cycle==='y'?'／年':'／月')}
+/* 你的名片升級後的樣子（示範值，只用來預覽） */
+function upgradedCard(c,tier){
+ c=Object.assign({},c||{});
+ if(tier==='plus'||tier==='pro'){c.hideBrand=1;if(!+c.hue)c.hue=(c.material==='steel')?128:(c.material==='mist')?182:42}
+ if(tier==='pro'){if(!c.ink){const set=(INK_SETS[c.material]||INK_SETS.silver);c.ink=(set[3]||set[1])[1]}if(!c.font||c.font==='modern')c.font='classic'}
+ return c}
+const TIER_FEATS={
+ plus:[['名片上不再有 Heycard 標記','只有你的品牌'],['自由配色','色調由你決定'],['所有款式解鎖','含色調款式']],
+ pro: [['洞察全開','人脈的結構、變化、往返'],['AI 搜尋 ×10','每月 200 次'],['名片字色與字體','每種材質一組合得來的顏色'],['年繳送 NFC 實體卡','一碰就交換'],['含 Plus 全部功能','']]};
+
+/* ═════ upsell：全站唯一的升級面板 ═════ */
+function upsell(need,why,opt){
+ opt=opt||{};
+ const cur=S.curCard()||{};
+ const tier=need==='pro'?'pro':'plus';
+ const feats=TIER_FEATS[tier].slice(0,3);
+ sheet('<div style="display:flex;align-items:center;gap:10px">'+tierPill(tier)+'<span style="font-size:12.5px;color:var(--ink3)">'+(tier==='pro'?'讓人脈會思考':'名片是你的')+'</span></div>'
+  +'<div style="font-size:19px;font-weight:800;letter-spacing:-.02em;margin-top:10px;line-height:1.35">'+esc(why||(tier==='pro'?'洞察、AI 與字色字體，都在 Pro':'拿掉標記、自由配色，都在 Plus'))+'</div>'
+  +'<div style="display:flex;align-items:center;gap:10px;margin-top:18px">'
+  +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--ink3);margin-bottom:6px">現在</div><div style="border-radius:10px;overflow:hidden">'+cardHTML(cur,150,{d:0,photo:0,flat:1,big:15})+'</div></div>'
+  +'<span style="color:var(--ink3);display:flex;flex:0 0 auto">'+ico('arr',18,'currentColor',2.2)+'</span>'
+  +'<div style="flex:1;min-width:0"><div style="font-size:11px;color:var(--mang);font-weight:700;margin-bottom:6px">升級後</div><div style="border-radius:10px;overflow:hidden;box-shadow:0 0 0 2px var(--mang)">'+cardHTML(upgradedCard(cur,tier),150,{d:0,photo:0,flat:1,big:15})+'</div></div>'
+  +'</div>'
+  +'<div style="margin-top:18px">'+feats.map(function(f){return '<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0"><span style="display:flex;color:var(--turq);margin-top:2px">'+ico('ck',15,'currentColor',2.8)+'</span><div><div style="font-size:14px">'+f[0]+'</div>'+(f[1]?'<div style="font-size:12px;color:var(--ink3)">'+f[1]+'</div>':'')+'</div></div>'}).join('')+'</div>'
+  +'<button class="btn" data-go="plans" data-goarg=\''+JSON.stringify({need:tier}).replace(/'/g,'')+'\' style="margin-top:16px;background:'+(tier==='pro'?'#111':'var(--mang)')+'">'+(tier==='pro'?'看 Pro，NT$179／月起':'看 Plus，NT$79／月起')+'</button>'
+  +'<button class="tx mut" data-act="sheetClose" style="display:block;margin:12px auto 0">先看看就好</button>')}
+paywall=function(need,why){upsell(need,why)};
+/* data-goarg：帶參數的 data-go */
+document.addEventListener('click',function(e){
+ const g=e.target.closest('[data-goarg]');if(!g)return;
+ e.stopPropagation();e.preventDefault();
+ let arg={};try{arg=JSON.parse(g.dataset.goarg)}catch(x){}
+ const s=$('.sheet');if(s)s.remove();
+ R.go(g.dataset.go,arg,'push')},true);
+
+/* ═════ 設計器：一次寫清楚，分層一眼看懂 ═════ */
+SCREENS.aiDesign=()=>{
+ const cur=S.curCard()||{};
+ let d={material:cur.material||'silver',layout:cur.layout||'classic',logoPos:cur.logoPos||'top',hue:+cur.hue||0,hideBrand:!!cur.hideBrand,ink:cur.ink||'',font:cur.font||'modern'};
+ let tab='style';
+ const TABS=[['style','款式',''],['mat','材質',''],['lay','版式',''],['logo','Logo',''],['hue','色調','plus'],['brand','標記','plus'],['ink','字色','pro'],['font','字體','pro']];
+ const el=screen(tbTitle('設計名片','<button class="tx" id="save">套用</button>')
+ +'<div style="flex:0 0 auto;background:var(--fill);padding:18px 0 12px"><div style="display:flex;justify-content:center" id="pv"></div><div id="using" style="display:flex;justify-content:center;gap:6px;margin-top:12px;min-height:18px"></div></div>'
+ +'<div id="tb2" style="flex:0 0 auto;display:flex;align-items:stretch;gap:0;padding:0 8px;border-bottom:1px solid var(--hair);background:#fff;overflow-x:auto;scrollbar-width:none;white-space:nowrap"></div>'
+ +'<div class="body pad" id="op" style="padding-top:16px;padding-bottom:28px"></div>');
+
+ const usesPlus=function(){return !!(d.hue||d.hideBrand)};
+ const usesPro=function(){return !!((d.ink&&d.ink.toLowerCase()!==(INK_DEFAULT[d.material]||INK_DEFAULT.silver).ink.toLowerCase())||(d.font&&d.font!=='modern'))};
+ const preview=function(){
+  $('#pv',el).innerHTML=cardHTML(Object.assign({},cur,d),172);
+  const u=[];if(usesPlus())u.push('plus');if(usesPro())u.push('pro');
+  $('#using',el).innerHTML=u.length?'<span style="font-size:11px;color:var(--ink3);margin-right:2px">用到</span>'+u.map(function(t){return tierPill(t)}).join(''):'<span style="font-size:11px;color:var(--ink3)">免費款</span>';
+  const need=(usesPro()&&!isPro())?'pro':(usesPlus()&&!isPlus())?'plus':'';
+  const sv=$('#save',el);
+  if(need){sv.textContent='升級並套用';sv.style.color=need==='pro'?'#111':'var(--mang)'}else{sv.textContent='套用';sv.style.color=''}};
+ const tabs=function(){
+  $('#tb2',el).innerHTML=TABS.map(function(t,i){
+   const sep=(i===4||i===6)?'<i style="width:1px;background:var(--e6);margin:12px 6px;flex:0 0 auto"></i>':'';
+   return sep+'<button class="tab '+(tab===t[0]?'on':'')+'" data-dt="'+t[0]+'" style="flex:0 0 auto;padding:12px 8px;display:inline-flex;align-items:center;gap:5px;font-size:13.5px">'+t[1]+(t[2]?tierPill(t[2],{hideWhenOwned:true}).replace('class="tp','class="tp mini'):'')+'</button>'}).join('')};
+ const lockNote=function(t){
+  if((t==='plus'&&isPlus())||(t==='pro'&&isPro()))return '';
+  return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:'+(t==='pro'?'#111':'#EEEEFF')+';color:'+(t==='pro'?'#F2E7C0':'#3A3AD0')+';margin-bottom:16px;font-size:12.5px">'
+   +tierPill(t)+'<span style="flex:1">先在自己的名片上試，喜歡再升級帶走</span></div>'};
+ const tile=function(c,on,extra){return '<div style="border-radius:9px;overflow:hidden;position:relative;'+(on?'box-shadow:0 0 0 2px var(--mang)':'')+'">'+cardHTML(c,96,{d:0,photo:0,flat:1,big:14})+(extra||'')+'</div>'};
+ const opts=function(){
+  let x='';
+  if(tab==='style')x='<div style="display:flex;flex-wrap:wrap;gap:14px">'+PRESETS.map(function(p,i){
+    const on=d.material===p.material&&d.hue===+p.hue&&d.layout===p.layout&&(d.ink||'')===(p.ink||'')&&(d.font||'modern')===(p.font||'modern');
+    const t=(p.ink||(p.font&&p.font!=='modern'))?'pro':(p.hue?'plus':'');
+    return '<button data-ps="'+i+'" style="flex:0 0 auto;text-align:center">'+tile(Object.assign({},cur,p),on,t?'<span style="position:absolute;top:5px;right:5px">'+tierPill(t,{hideWhenOwned:true})+'</span>':'')
+     +'<div style="font-size:12.5px;font-weight:'+(on?700:400)+';margin-top:8px">'+p.n+'</div></button>'}).join('')+'</div>';
+  if(tab==='mat')x='<div style="display:flex;flex-wrap:wrap;gap:14px">'+Object.keys(MAT).map(function(m){const on=d.material===m;
+    return '<button data-mat="'+m+'" style="flex:0 0 auto;text-align:center">'+tile(Object.assign({},cur,d,{material:m}),on)+'<div style="font-size:12.5px;font-weight:'+(on?700:400)+';margin-top:8px">'+MAT[m].n+'</div></button>'}).join('')+'</div>';
+  if(tab==='lay')x=Object.keys(LAYOUTS).map(function(L){const on=d.layout===L;
+    return '<button data-lay="'+L+'" style="width:100%;text-align:left;display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--hair)">'
+    +'<div style="border-radius:6px;overflow:hidden;flex:0 0 auto;'+(on?'box-shadow:0 0 0 2px var(--mang)':'')+'">'+cardHTML(Object.assign({},cur,d,{layout:L}),58,{d:0,photo:0,flat:1,big:11})+'</div>'
+    +'<span style="flex:1;font-size:14px;font-weight:'+(on?700:400)+'">'+LAYOUTS[L]+'</span>'+(on?'<span style="color:var(--mang);display:flex">'+ico('ck',16,'currentColor',2.6)+'</span>':'')+'</button>'}).join('');
+  if(tab==='logo')x=(cur.logo?'':'<button class="btn tt sm" data-fld="logo" style="width:100%;margin-bottom:16px">先上傳公司 Logo</button>')
+   +Object.keys(LOGOPOS).map(function(P){const on=d.logoPos===P;
+    return '<button data-lp="'+P+'" style="width:100%;text-align:left;display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--hair)">'
+    +'<div style="border-radius:6px;overflow:hidden;flex:0 0 auto;'+(on?'box-shadow:0 0 0 2px var(--mang)':'')+'">'+cardHTML(Object.assign({},cur,d,{logoPos:P}),58,{d:0,photo:0,flat:1,big:11})+'</div>'
+    +'<span style="flex:1;font-size:14px;font-weight:'+(on?700:400)+'">'+LOGOPOS[P]+'</span>'+(on?'<span style="color:var(--mang);display:flex">'+ico('ck',16,'currentColor',2.6)+'</span>':'')+'</button>'}).join('');
+  if(tab==='hue'){
+   const grey=/^(silver|mist|steel)$/.test(d.material);
+   x=lockNote('plus')+'<div style="display:flex;flex-wrap:wrap;gap:12px">'+HUES.map(function(hv){const on=d.hue===hv;
+    const bg=MAT[d.material].bg;
+    return '<button data-hue="'+hv+'" style="width:52px;height:52px;border-radius:14px;position:relative;overflow:hidden;background:'+bg+';'+(hv&&!grey?'filter:hue-rotate('+hv+'deg) saturate(1.1);':'')+(on?'box-shadow:0 0 0 2px var(--mang)':'border:1px solid var(--e6)')+'">'
+     +(hv&&grey?'<i style="position:absolute;inset:0;background:hsl('+hv+' 72% '+(d.material==='steel'?46:62)+'% / '+(d.material==='steel'?.34:.28)+');mix-blend-mode:color"></i>':'')+'</button>'}).join('')
+    +'</div><div style="margin-top:22px"><input id="hs" type="range" min="0" max="350" step="2" value="'+d.hue+'" style="width:100%"></div>'}
+  if(tab==='brand')x=lockNote('plus')
+   +'<button data-brand="1" style="width:100%;text-align:left;display:flex;align-items:center;gap:12px;padding:14px 0"><div style="flex:1"><div style="font-size:14px">隱藏名片上的 Heycard 標記</div><div style="font-size:12px;color:var(--ink3);margin-top:2px">你的名片，只有你的品牌</div></div><span class="sw'+(d.hideBrand?' on':'')+'"><i></i></span></button>';
+  if(tab==='ink'){
+   const set=INK_SETS[d.material]||INK_SETS.silver,curInk=(d.ink||set[0][1]).toLowerCase();
+   x=lockNote('pro')+'<div style="font-size:12.5px;color:var(--ink3);margin-bottom:14px">這種材質合得來的字色</div><div style="display:flex;flex-wrap:wrap;gap:14px">'
+    +set.map(function(s){const on=s[1].toLowerCase()===curInk;
+     return '<button data-ink="'+s[1]+'" style="text-align:center"><div style="width:52px;height:52px;border-radius:14px;background:'+MAT[d.material].bg+';display:flex;align-items:center;justify-content:center;'+(on?'box-shadow:0 0 0 2px var(--mang)':'border:1px solid var(--e6)')+'"><span style="font-size:22px;font-weight:300;color:'+s[1]+'">永</span></div><div style="font-size:11px;margin-top:6px;font-weight:'+(on?700:400)+'">'+s[0]+'</div></button>'}).join('')
+    +'</div><div style="display:flex;align-items:center;gap:12px;margin-top:22px;padding-top:18px;border-top:1px solid var(--hair)"><span style="font-size:14px;flex:1">自訂顏色</span><input id="inkPick" type="color" value="'+(d.ink||set[0][1])+'" style="width:44px;height:32px;border:0;background:none;padding:0"></div>'}
+  if(tab==='font')x=lockNote('pro')+Object.keys(FONTS).map(function(k){const F=FONTS[k],on=d.font===k;
+    return '<button data-font="'+k+'" style="width:100%;text-align:left;display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--hair)">'
+    +'<div style="width:64px;height:44px;border-radius:9px;background:var(--fill);display:flex;align-items:center;justify-content:center;flex:0 0 auto;'+(on?'box-shadow:0 0 0 2px var(--mang)':'')+'"><span style="font-family:'+F.css+';font-weight:'+F.w+';letter-spacing:'+F.ls+';font-size:22px">名片</span></div>'
+    +'<div style="flex:1"><div style="font-size:14px;font-weight:'+(on?700:400)+'">'+F.n+'</div><div style="font-size:12px;color:var(--ink3);margin-top:2px">'+(k==='modern'?'Taipei Sans，VI 標準':k==='classic'?'宋體，穩重、有年資感':'細體、寬字距，留白多')+'</div></div>'
+    +(on?'<span style="color:var(--mang);display:flex">'+ico('ck',16,'currentColor',2.6)+'</span>':'')+'</button>'}).join('');
+  $('#op',el).innerHTML=x};
+ const draw=function(){preview();tabs();opts()};
+
+ el.addEventListener('input',function(e){
+  if(e.target.id==='hs'){d.hue=+e.target.value;preview()}
+  if(e.target.id==='inkPick'){d.ink=e.target.value;preview()}});
+ el.addEventListener('click',function(e){
+  const t=e.target.closest('[data-dt]');if(t){tab=t.dataset.dt;draw();return}
+  const ps=e.target.closest('[data-ps]');if(ps){const p=PRESETS[+ps.dataset.ps];d.material=p.material;d.hue=+p.hue||0;d.layout=p.layout;d.logoPos=p.logoPos;d.ink=p.ink||'';d.font=p.font||'modern';draw();return}
+  const m=e.target.closest('[data-mat]');if(m){d.material=m.dataset.mat;draw();return}
+  const hu=e.target.closest('[data-hue]');if(hu){d.hue=+hu.dataset.hue;draw();return}
+  const L=e.target.closest('[data-lay]');if(L){d.layout=L.dataset.lay;draw();return}
+  const P=e.target.closest('[data-lp]');if(P){d.logoPos=P.dataset.lp;draw();return}
+  const b=e.target.closest('[data-brand]');if(b){d.hideBrand=!d.hideBrand;draw();return}
+  const ik=e.target.closest('[data-ink]');if(ik){d.ink=ik.dataset.ink;draw();return}
+  const ft=e.target.closest('[data-font]');if(ft){d.font=ft.dataset.font;draw();return}
+  if(e.target.closest('#save')){
+   const needPro=usesPro()&&!isPro(),needPlus=usesPlus()&&!isPlus();
+   const cards=S.cards,i=cards.findIndex(function(x){return x.id===cur.id});
+   /* 免費的部分先存起來；付費的部分升級後才帶走 */
+   const keep={material:d.material,layout:d.layout,logoPos:d.logoPos};
+   if(isPlus()){keep.hue=d.hue;keep.hideBrand=d.hideBrand}
+   if(isPro()){keep.ink=d.ink;keep.font=d.font}
+   if(i>=0){Object.assign(cards[i],keep);S.cards=cards}
+   if(needPro||needPlus){
+    upsell(needPro?'pro':'plus',needPro?'這張設計用到了字色與字體，升級 Pro 就能帶走':'這張設計用到了色調或去標記，升級 Plus 就能帶走');
+    return}
+   R.back();R.refresh();toast('已套用')}});
+ setTimeout(draw,0);
+ return el};
+
+/* ═════ 方案頁：你的名片，升級之後 ═════ */
+SCREENS.plans=(a)=>{
+ a=a||{};
+ const cur=S.curCard()||{};
+ let sel=a.need||(plan()==='free'?'plus':plan()==='plus'?'pro':'pro');
+ let cyc=PLAN_CYCLE||'y';
+ const el=screen(tbTitle('方案')
+ +'<div class="body" style="padding-bottom:calc(30px + var(--sab))">'
+ +'<div style="background:var(--fill);padding:20px 0 18px">'
+ +'<div style="display:flex;justify-content:center;gap:6px;padding:0 20px" id="seg"></div>'
+ +'<div id="pv" style="display:flex;justify-content:center;margin-top:18px;transition:transform .2s"></div>'
+ +'<div id="cap" style="text-align:center;font-size:12.5px;color:var(--ink3);margin-top:12px;padding:0 24px;line-height:1.7"></div>'
+ +'</div>'
+ +'<div class="pad" id="feat" style="padding-top:18px"></div>'
+ +'<div class="pad" style="margin-top:14px"><div style="display:flex;background:var(--fill);border-radius:12px;padding:4px" id="cyc"></div></div>'
+ +'<div class="pad" style="margin-top:14px" id="cta"></div>'
+ +'<div class="pad" style="margin-top:28px"><div id="cmp"></div></div>'
+ +'<div class="pad" style="font-size:12px;color:var(--ink3);line-height:1.8;margin-top:22px;text-align:center">隨時可以取消，用到期末為止。<br>訂閱在 heycard.app 完成，不經 App Store。'+(plan()!=='free'?'<br>目前是 '+PLANS[plan()].n+'（'+(planCycle()==='y'?'年繳':'月繳')+'）':'')+'</div>'
+ +'</div>');
+ const CAP={free:'現在的名片，已經很好用',plus:'拿掉標記、自由配色——名片是你的',pro:'字色、字體、洞察與 AI——人脈會思考'};
+ const draw=function(){
+  $('#seg',el).innerHTML=['free','plus','pro'].map(function(k){const on=sel===k;
+   return '<button data-seg="'+k+'" style="padding:8px 16px;border-radius:99px;font-size:13px;font-weight:'+(on?800:400)+';background:'+(on?(k==='pro'?'#111':k==='plus'?'var(--mang)':'#fff'):'transparent')+';color:'+(on?(k==='free'?'var(--ink)':'#fff'):'var(--ink2)')+';'+(on&&k==='free'?'box-shadow:0 1px 3px rgba(0,0,0,.08)':'')+'">'+PLANS[k].n+'</button>'}).join('');
+  $('#pv',el).innerHTML='<div style="border-radius:14px;overflow:hidden;box-shadow:'+(sel==='free'?'none':'0 18px 40px -18px rgba(20,20,40,.35)')+'">'+cardHTML(sel==='free'?cur:upgradedCard(cur,sel),210,{d:0})+'</div>';
+  $('#cap',el).textContent=CAP[sel]+(plan()===sel?'（目前方案）':'');
+  const feats=sel==='free'?[['多張名片、多重身分',''],['收名片、人脈、訊息、尋求全部免費',''],['5 種材質、3 種版式',''],['AI 搜尋每月 20 次','']]:TIER_FEATS[sel];
+  $('#feat',el).innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+(sel==='free'?'<span class="tp" style="background:var(--fill);color:var(--ink2)">FREE</span>':tierPill(sel))+'<span style="font-size:15px;font-weight:800;letter-spacing:-.01em">'+(sel==='free'?'免費就有':PLANS[sel].tag)+'</span></div>'
+   +feats.map(function(f){return '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--hair)"><span style="display:flex;color:var(--turq);margin-top:2px">'+ico('ck',15,'currentColor',2.8)+'</span><div style="flex:1"><div style="font-size:14px">'+f[0]+'</div>'+(f[1]?'<div style="font-size:12px;color:var(--ink3);margin-top:1px">'+f[1]+'</div>':'')+'</div></div>'}).join('');
+  $('#cyc',el).innerHTML=[['y','年繳'],['m','月繳']].map(function(x){const on=cyc===x[0];
+   return '<button data-cyc="'+x[0]+'" style="flex:1;padding:9px;border-radius:9px;font-size:13px;font-weight:'+(on?700:400)+';background:'+(on?'#fff':'transparent')+';color:'+(on?'var(--ink)':'var(--ink2)')+';'+(on?'box-shadow:0 1px 3px rgba(0,0,0,.08)':'')+'">'+x[1]+(x[0]==='y'?'<span style="font-size:11px;color:var(--turqD);margin-left:6px">省 2 個月'+(sel==='pro'?' · 送 NFC 卡':'')+'</span>':'')+'</button>'}).join('');
+  $('#cyc',el).parentNode.style.display=sel==='free'?'none':'';
+  const own=PLAN_RANK[plan()]>=PLAN_RANK[sel];
+  $('#cta',el).innerHTML=sel==='free'?'<button class="btn gh" data-act="back">繼續用免費版</button>'
+   :own?'<button class="btn" disabled>'+(plan()===sel?'使用中':'已包含在 '+PLANS[plan()].n+'</button>')
+   :'<button class="btn" data-checkout="'+sel+'" style="background:'+(sel==='pro'?'#111':'var(--mang)')+'">'+(PLAN_RANK[sel]<PLAN_RANK[plan()]?'改為 ':'升級 ')+PLANS[sel].n+'　'+priceText(sel,cyc)+'</button>'
+   +(cyc==='y'?'<div style="text-align:center;font-size:12px;color:var(--ink3);margin-top:8px">相當於每月 NT$'+Math.round(planPrice(sel,'y')/12)+'</div>':'');
+  const rows=[['移除 Heycard 標記',0,1,1],['自由配色',0,1,1],['所有款式',0,1,1],['字色與字體',0,0,1],['洞察',0,0,1],['AI 搜尋／月','20','20','200'],['NFC 實體卡','—','—','年繳送']];
+  $('#cmp',el).innerHTML='<div style="display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;font-size:12.5px;align-items:center;row-gap:0">'
+   +'<div></div><div style="text-align:center;font-family:var(--fe);font-weight:700;color:var(--ink3);padding-bottom:8px">Free</div><div style="text-align:center;padding-bottom:8px">'+tierPill('plus')+'</div><div style="text-align:center;padding-bottom:8px">'+tierPill('pro')+'</div>'
+   +rows.map(function(r){return '<div style="padding:9px 0;border-top:1px solid var(--hair);color:var(--ink2)">'+r[0]+'</div>'+r.slice(1).map(function(v,i){
+     const bg=(i===['free','plus','pro'].indexOf(sel))?'background:var(--fill);':'';
+     return '<div style="padding:9px 0;border-top:1px solid var(--hair);text-align:center;'+bg+'">'+(v===1?'<span style="color:var(--turq);display:inline-flex">'+ico('ck',14,'currentColor',3)+'</span>':v===0?'<span style="color:#D0D0D6">—</span>':'<span style="font-family:var(--fe)">'+v+'</span>')+'</div>'}).join('')}).join('')+'</div>'};
+ el.addEventListener('click',function(e){
+  const s=e.target.closest('[data-seg]');if(s){sel=s.dataset.seg;draw();return}
+  const c=e.target.closest('[data-cyc]');if(c){cyc=c.dataset.cyc;PLAN_CYCLE=cyc;draw();return}
+  const k=e.target.closest('[data-checkout]');if(k){R.go('checkout',{plan:k.dataset.checkout,cycle:cyc},'modal')}});
+ setTimeout(draw,0);
+ return el};
+
+/* ═════ 網頁付款（heycard.app）：不經 App Store ═════ */
+SCREENS.checkout=(a)=>{
+ a=a||{};const key=a.plan||'plus',cyc=a.cycle||'y';
+ let pay='card';
+ const el=screen('<div class="tb"><div class="tbi" style="height:46px;justify-content:center;gap:8px;background:#F4F4F6"><span style="display:flex;color:var(--turqD)">'+ico('shield',14,'currentColor',2.2)+'</span><span style="font-family:var(--fe);font-size:12px;color:var(--ink2)">heycard.app／checkout　·　安全付款</span><button class="ib" data-act="back" style="position:absolute;right:8px;width:34px;height:34px">'+ico('x',16)+'</button></div></div>'
+ +'<div class="body pad" style="padding-top:22px;padding-bottom:calc(30px + var(--sab))">'
+ +'<div style="display:flex;align-items:center;gap:8px">'+tierPill(key)+'<span style="font-size:12.5px;color:var(--ink3)">'+PLANS[key].tag+'</span></div>'
+ +'<div style="font-size:24px;font-weight:800;letter-spacing:-.03em;margin-top:8px">訂閱 '+PLANS[key].n+'</div>'
+ +'<div class="pl" style="margin-top:18px;padding:0;overflow:hidden">'
+ +'<div style="display:flex;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--hair)"><span style="font-size:14px">'+PLANS[key].n+'　'+(cyc==='y'?'年繳':'月繳')+'</span><span style="font-family:var(--fe);font-size:14px;font-weight:700">'+priceText(key,cyc)+'</span></div>'
+ +(key==='pro'&&cyc==='y'?'<div style="display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--hair);font-size:13px"><span>NFC 實體卡 ×1（寄到名片上的地址）</span><span style="color:var(--turqD);font-weight:700">贈送</span></div>':'')
+ +'<div style="display:flex;justify-content:space-between;padding:12px 16px;font-size:13px;color:var(--ink3)"><span>'+(cyc==='y'?'下次扣款：一年後':'下次扣款：一個月後')+'　·　隨時取消</span></div></div>'
+ +'<div class="sec"><b>付款方式</b></div><div id="pays"></div>'
+ +'<div class="sim" style="margin-top:18px">'+ico('warn',11,'#8A6500',2.2)+'原型：不會真的扣款</div>'
+ +'<button class="btn" id="payBtn" style="margin-top:18px;background:'+(key==='pro'?'#111':'var(--mang)')+'">付款　'+priceText(key,cyc)+'</button>'
+ +'<div style="font-size:11.5px;color:var(--ink3);text-align:center;margin-top:12px;line-height:1.7">付款由 heycard.app 處理，不經 App Store。付款完成會自動回到 App。</div>'
+ +'</div>');
+ const PAYS=[['card','信用卡／簽帳卡','Visa · Mastercard · JCB'],['apple','Apple Pay',''],['line','LINE Pay','']];
+ const draw=function(){$('#pays',el).innerHTML=PAYS.map(function(p){const on=pay===p[0];
+  return '<button data-pay="'+p[0]+'" style="width:100%;text-align:left;display:flex;align-items:center;gap:12px;padding:13px 14px;border:1px solid '+(on?'var(--mang)':'var(--e6)')+';border-radius:12px;margin-bottom:8px;background:'+(on?'#fff':'transparent')+'">'
+   +'<span style="width:18px;height:18px;border-radius:99px;border:2px solid '+(on?'var(--mang)':'#C8C8D0')+';display:flex;align-items:center;justify-content:center;flex:0 0 auto">'+(on?'<i style="width:8px;height:8px;border-radius:99px;background:var(--mang)"></i>':'')+'</span>'
+   +'<span style="flex:1;font-size:14px">'+p[1]+(p[2]?'<span style="font-size:11.5px;color:var(--ink3);margin-left:8px">'+p[2]+'</span>':'')+'</span></button>'}).join('')};
+ el.addEventListener('click',function(e){
+  const p=e.target.closest('[data-pay]');if(p){pay=p.dataset.pay;draw();return}
+  if(e.target.closest('#payBtn')){
+   const b=$('#payBtn',el);b.disabled=true;b.textContent='處理中…';
+   setTimeout(function(){setPlan(key,cyc);R.replace('subDone',{plan:key,cycle:cyc})},900)}});
+ setTimeout(draw,0);
+ return el};
+
+/* ═════ 開通完成：讓升級有儀式感 ═════ */
+SCREENS.subDone=(a)=>{
+ a=a||{};const key=a.plan||'plus';
+ const cur=S.curCard()||{};
+ const el=screen('<div class="body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px calc(30px + var(--sab));text-align:center;background:'+(key==='pro'?'linear-gradient(180deg,#15151C,#0F0F14)':'linear-gradient(180deg,#F4F4FF,#fff)')+';color:'+(key==='pro'?'#fff':'var(--ink)')+'">'
+ +'<div style="animation:tin .5s both">'+tierPill(key)+'</div>'
+ +'<div style="font-size:26px;font-weight:800;letter-spacing:-.03em;margin-top:12px;animation:tin .5s .1s both">'+(key==='pro'?'人脈會思考了':'名片是你的了')+'</div>'
+ +'<div style="font-size:14px;opacity:.7;margin-top:8px;line-height:1.7;animation:tin .5s .2s both">'+(key==='pro'?'洞察、AI 搜尋 200 次、字色與字體都已開啟'+(a.cycle==='y'?'。<br>NFC 卡會寄到你名片上的地址':''):'標記已可拿掉，色調由你決定')+'</div>'
+ +'<div style="margin:30px 0 26px;border-radius:16px;overflow:hidden;box-shadow:0 30px 60px -24px rgba(0,0,0,.5);animation:tin .6s .3s both">'+cardHTML(upgradedCard(cur,key),210,{d:0})+'</div>'
+ +'<button class="btn" data-go2="aiDesign" style="max-width:320px;background:'+(key==='pro'?'#fff':'var(--mang)')+';color:'+(key==='pro'?'#111':'#fff')+'">去設計名片</button>'
+ +'<button class="tx" data-go2="me" style="margin-top:12px;color:'+(key==='pro'?'rgba(255,255,255,.7)':'var(--ink3)')+'">回到我的名片</button>'
+ +'</div>');
+ el.addEventListener('click',function(e){
+  const g=e.target.closest('[data-go2]');if(!g)return;
+  TAB='me';R.reset('me');if(g.dataset.go2==='aiDesign')R.go('aiDesign',{},'push')});
+ return el};
+
+/* ═════ 設定：訂閱列掛徽章 ═════ */
+const _set48=SCREENS.settings;
+SCREENS.settings=()=>{
+ const el=_set48();
+ setTimeout(function(){
+  const b=$('[data-go="plans"]',el);if(!b)return;
+  const nm=b.querySelector('span');if(nm&&plan()!=='free')nm.insertAdjacentHTML('afterend',tierPill(plan()));},0);
+ return el};
+
+/* ═════ 洞察鎖：改用同一個徽章與 upsell ═════ */
+(function(){
+ const st=document.createElement('style');
+ st.textContent='.tp.mini{font-size:8.5px;padding:2px 5px}';
+ document.head.appendChild(st)})();
+/* ═══════════════════════════════════════════
+   v3.0 ㊴：以設計代替文字——幾個入口頁的重排
+   ─────────────────────────────────────────
+   ① 建立名片（cardMode）：兩張大磁磚（相機／鍵盤），一句話就好。
+   ② 我的名片（me）：分享鈕下的三個文字連結 → IG 個人頁式的三顆等寬按鈕
+      （編輯／設計／預覽，帶圖示）；名片下方一條「設計狀態」細帶——
+      免費款／用到 PLUS／PRO——付費層級在最常看的地方就分得清楚。
+   ③ 名片頁把「當前身分」提示與 email 收成一行，畫面呼吸。
+   ═══════════════════════════════════════════ */
+
+/* ═════ ① 建立名片 ═════ */
+SCREENS.cardMode=()=>screen(tbTitle('建立名片',null,true)
+ +'<div class="body pad" style="padding-top:26px;padding-bottom:calc(30px + var(--sab))">'
+ +'<div style="font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1.3">第一張名片</div>'
+ +'<div style="font-size:13px;color:var(--ink3);margin-top:6px">兩分鐘。之後隨時能改。</div>'
+ +'<button data-act="scanMine" style="width:100%;margin-top:26px;border-radius:20px;overflow:hidden;position:relative;background:linear-gradient(160deg,#1E1E26,#0F0F14);color:#fff;text-align:left;padding:22px 20px 20px;min-height:168px;display:flex;flex-direction:column;justify-content:flex-end">'
+ +'<div style="position:absolute;right:18px;top:18px;width:120px;aspect-ratio:1.586/1;border-radius:8px;border:1.5px solid rgba(255,255,255,.55);background:rgba(255,255,255,.06)">'
+ +['top:6px;left:6px;border-width:1.5px 0 0 1.5px','top:6px;right:6px;border-width:1.5px 1.5px 0 0','bottom:6px;left:6px;border-width:0 0 1.5px 1.5px','bottom:6px;right:6px;border-width:0 1.5px 1.5px 0'].map(function(s){return '<i style="position:absolute;width:10px;height:10px;border:0 solid #fff;'+s+'"></i>'}).join('')
+ +'<div style="position:absolute;left:14px;top:22px;width:44px;height:2px;background:rgba(255,255,255,.7);border-radius:2px"></div><div style="position:absolute;left:14px;top:30px;width:28px;height:2px;background:rgba(255,255,255,.35);border-radius:2px"></div><div style="position:absolute;left:14px;bottom:16px;width:56px;height:2px;background:rgba(255,255,255,.35);border-radius:2px"></div></div>'
+ +'<div style="width:40px;height:40px;border-radius:12px;background:var(--mang);display:flex;align-items:center;justify-content:center;margin-bottom:14px">'+ico('cam',20,'#fff')+'</div>'
+ +'<div style="font-size:17px;font-weight:800;letter-spacing:-.01em">拍實體名片</div>'
+ +'<div style="font-size:12.5px;color:rgba(255,255,255,.62);margin-top:3px">正反面各一張，自動辨識中英文</div></button>'
+ +'<button data-act="manual" style="width:100%;margin-top:12px;border-radius:20px;background:var(--fill);text-align:left;padding:20px;display:flex;align-items:center;gap:16px">'
+ +'<div style="width:40px;height:40px;border-radius:12px;background:#fff;display:flex;align-items:center;justify-content:center;flex:0 0 auto;box-shadow:0 1px 3px rgba(0,0,0,.08)">'+ico('edit',19,'var(--ink)')+'</div>'
+ +'<div style="flex:1"><div style="font-size:15px;font-weight:700">自己輸入</div><div style="font-size:12.5px;color:var(--ink3);margin-top:2px">只有姓名必填</div></div>'+ico('arr',16,'#C4C4CC')+'</button>'
+ +'</div>');
+
+/* ═════ ② 我的名片：動作列 ＋ 設計狀態帶 ═════ */
+function designStateHTML(c){
+ c=c||{};
+ const plus=!!(+c.hue||c.hideBrand);
+ const pro=!!((c.ink&&INK_DEFAULT[c.material]&&c.ink.toLowerCase()!==INK_DEFAULT[c.material].ink.toLowerCase())||(c.font&&c.font!=='modern'));
+ const p=plan();
+ let txt,pills='';
+ if(pro){txt='Pro 設計';pills=tierPill('pro')}
+ else if(plus){txt='Plus 設計';pills=tierPill('plus')}
+ else{txt='免費款';pills=(p==='free'?'<span style="font-size:12px;color:var(--mang);font-weight:700">升級後：拿掉標記、自由配色 →</span>':p==='plus'?'<span style="font-size:12px;color:var(--mang);font-weight:700">試試色調與去標記 →</span>':'<span style="font-size:12px;color:var(--mang);font-weight:700">試試字色與字體 →</span>')}
+ return '<button data-act="aiDesign" style="width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;margin-top:12px;border-radius:12px;background:var(--fill);text-align:left">'
+  +'<span style="font-size:12px;color:var(--ink3)">'+txt+'</span>'+(pro||plus?pills:'')+'<span style="flex:1"></span>'+(pro||plus?'':pills)+'</button>'}
+
+const _me49=SCREENS.me;
+SCREENS.me=()=>{
+ const el=_me49();
+ const cur=S.curCard();
+ setTimeout(function(){
+  /* 三個文字連結 → 三顆等寬按鈕 */
+  const pv=$('[data-act="preview"]',el);
+  const row=pv&&pv.parentNode;
+  if(row&&row.children.length===3&&pv.classList.contains('tx')){
+   row.style.cssText='display:flex;gap:8px;margin-top:10px';
+   [['editCard','edit','編輯'],['aiDesign','swap','設計'],['preview','qr','預覽']].forEach(function(x,i){
+    const b=row.children[i];if(!b)return;
+    b.className='btn tt';b.dataset.act=x[0];b.style.cssText='flex:1;padding:11px 8px;font-size:13px;gap:6px';
+    b.innerHTML=ico(x[1],16,'currentColor')+x[2]});
+   /* 設計狀態帶 */
+   if(cur)row.insertAdjacentHTML('afterend',designStateHTML(cur))}
+ },0);
+ return el};
+
+/* 「預覽」在 IG 的語意是公開頁：圖示用 QR／公開頁 */
+/* ═══════════════════════════════════════════
+   v3.1 ㊵：洞察＝每一條都有下一步 ＋ 時機 ＋ 商業提案（Pro）
+   ─────────────────────────────────────────
+   ① 洞察鐵則：沒有下一步的洞察不准出現。每張卡最後一行都是一顆可以按的
+      動作——發需求、打招呼、看這幾位、寫提案、引薦。訂 Pro 之後會不會續訂，
+      看的是「這個月它有沒有讓我做成幾件事」。
+   ② 新增「時機」：依月份／季度推商業節奏（Q3 底編明年預算、Q4 電商衝刺、
+      年初人事異動、股東會季…），比對你的專長（名片的可提供／產業／職稱）
+      和人脈裡符合條件的人，給一句「現在該找誰、說什麼」，附行動。
+      原型是規則表；正式版由 LLM 依產業＋地區產生，並可學習你點過哪些。
+   ③ 「你的網路」維度切換就地重畫，不再整頁重整跳回頂端。
+   ④ 「樞紐」改叫「引路人」，一句話解釋為什麼是他，並附「請他引薦」動作。
+   ⑤ 商業提案（Pro）：人脈頁「合作機會」下多一顆「為他寫提案」。
+      提案＝我看到的機會／我能提供／合作方式／下一步 四段，可改可送。
+   ═══════════════════════════════════════════ */
+
+/* ═════ 時機規則表（原型）═════ */
+const SEASONS=[
+ {m:[1,2],  t:'年初人事與預算啟動',   w:'新年度組織與預算剛定，決策者最願意聽新方案',    who:{level:['決策層','高階主管']},                         me:['顧問','行銷','品牌','軟體','系統','設計'], role:'新年度合作夥伴',       act:'hello'},
+ {m:[3,4],  t:'Q1 結算、展會季開跑',   w:'第一季數字出來，補強動作會在四月啟動',          who:{industry:['科技業','製造業','電商']},                  me:['行銷','業務','通路','製造','供應'],       role:'Q2 補強專案的合作夥伴', act:'compose'},
+ {m:[5,6],  t:'股東會季，上市櫃公司對外說故事', w:'年報與股東會前，公司最需要案例與曝光', who:{ticker:1},                                            me:['公關','行銷','媒體','品牌','設計'],       role:'年度案例與曝光的協作夥伴', act:'compose'},
+ {m:[7,8,9],t:'Q3 底：企業開始編明年預算', w:'預算在九月底前定案，現在進去才排得進明年',  who:{level:['決策層','高階主管'],func:['行銷','採購','經營管理','策略']}, me:['行銷','廣告','顧問','軟體','系統','設計','人資','培訓'], role:'明年度預算內的長期合作夥伴', act:'compose'},
+ {m:[10,11],t:'Q4 電商與零售衝刺',       w:'雙 11 到年末檔期，電商、零售、物流全在找支援',   who:{industry:['電商','零售','物流']},                     me:['物流','倉儲','系統','行銷','客服','設計'], role:'Q4 檔期的即戰力夥伴',    act:'compose'},
+ {m:[12],   t:'年終：回顧與感謝的季節',   w:'一年一次最自然的問候時點，深聊過的人現在該聯絡', who:{tier:[0,1]},                                          me:[],                                         role:'',                     act:'hello'}];
+
+function seasonNow(d){
+ d=d||new Date();const m=d.getMonth()+1;
+ return SEASONS.filter(function(s){return s.m.indexOf(m)>=0})}
+function myTags(){
+ const me=S.curCard()||{};
+ return [me.offer,me.industry,me.title,me.headline,me.company].filter(Boolean).join(' ')}
+function seasonMatch(s){
+ const cs=S.contacts,w=s.who||{};
+ return cs.filter(function(c){
+  if(w.level&&w.level.indexOf(c.level)<0&&!(w.func&&w.func.some(function(f){return (c.func||c.title||'').indexOf(f)>=0})))return false;
+  if(w.industry&&w.industry.indexOf(c.industry)<0)return false;
+  if(w.ticker){const o=(typeof orgOf==='function')?orgOf(c.company,c):null;if(!o||!o.ticker)return false}
+  if(w.tier&&typeof tierOf==='function'&&w.tier.indexOf(tierOf(c))<0)return false;
+  return true})}
+function seasonHTML(){
+ const ss=seasonNow();if(!ss.length)return '';
+ const tags=myTags();
+ return '<div class="sec" style="margin-top:20px"><b>時機</b><span class="ai" style="flex:0 0 auto">AI</span></div>'
+ +ss.map(function(s){
+   const hit=seasonMatch(s);
+   const fit=s.me.filter(function(k){return tags.indexOf(k)>=0});
+   const faces=hit.slice(0,4).map(function(c){return '<span style="margin-right:-8px;border:2px solid #fff;border-radius:99px;display:inline-flex">'+faceOf(c,28)+'</span>'}).join('');
+   const line=hit.length
+    ?'<span>你的人脈裡有</span> <b>'+hit.length+'</b> <span>位正是這波的對象</span>'+(fit.length?'<span>，而你的「'+esc(fit[0])+'」正好接得上</span>':'')
+    :'目前人脈裡還沒有這波的對象——發一則需求，讓人脈幫你找';
+   const primary=(s.act==='compose'&&s.role)
+    ?'<button class="btn sm" data-compose-role="'+esc(s.role)+'">發需求：'+esc(s.role)+'</button>'
+    :'<button class="btn sm" data-season-hello="'+(hit[0]?hit[0].id:'')+'"'+(hit[0]?'':' disabled')+'>打招呼</button>';
+   const second=hit.length?'<button class="btn tt sm" data-season-list="'+SEASONS.indexOf(s)+'">看這 '+hit.length+' 位</button>':'';
+   return '<div style="padding:16px;border:1px solid var(--e6);border-radius:16px;margin-bottom:10px">'
+   +'<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--fe);font-size:10.5px;font-weight:800;letter-spacing:.06em;color:var(--mang);background:var(--mangS);padding:3px 7px;border-radius:99px">'+['','1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'][new Date().getMonth()+1]+'</span>'
+   +'<b style="font-size:14.5px;font-weight:800;letter-spacing:-.01em">'+esc(s.t)+'</b></div>'
+   +'<div style="font-size:12.5px;color:var(--ink2);line-height:1.7;margin-top:8px"><span>'+esc(s.w)+'</span><span>。</span><span>'+line+'</span></div>'
+   +(faces?'<div style="display:flex;align-items:center;margin-top:12px;padding-left:2px">'+faces+'<span style="font-size:11.5px;color:var(--ink3);margin-left:16px">'+esc(hit.slice(0,2).map(function(c){return c.name}).join('、'))+(hit.length>2?' 等':'')+'</span></div>':'')
+   +'<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">'+primary+second+'</div>'
+   +'</div>'}).join('')}
+
+/* 時機的動作 */
+document.addEventListener('click',function(e){
+ const r=e.target.closest('[data-compose-role]');
+ if(r){R.go('compose',{role:r.dataset.composeRole},'push');return}
+ const hl=e.target.closest('[data-season-hello]');
+ if(hl&&hl.dataset.seasonHello){R.go('draft',{kind:'hello',id:hl.dataset.seasonHello},'push');return}
+ const ls=e.target.closest('[data-season-list]');
+ if(ls){R.go('seasonList',{i:+ls.dataset.seasonList},'push');return}});
+
+SCREENS.seasonList=(a)=>{
+ const s=SEASONS[a.i]||SEASONS[0],hit=seasonMatch(s);
+ return screen(tbTitle(s.t)
+ +'<div class="body pad" style="padding-top:12px;padding-bottom:28px">'
+ +'<div style="font-size:12.5px;color:var(--ink3);line-height:1.7;margin-bottom:8px">'+esc(s.w)+'。這 '+hit.length+' 位是這波最該聯絡的人。</div>'
+ +hit.map(function(c){return '<button data-c="'+c.id+'" class="row" style="width:100%;text-align:left">'+faceOf(c,44)
+   +'<div class="rt"><div class="n">'+esc(c.name)+'</div><div class="s">'+esc(idLine(c))+'</div></div>'
+   +'<button class="btn tt sm" data-draft="hello:'+c.id+'" style="padding:8px 12px">打招呼</button></button>'}).join('')
+ +'</div>')};
+
+/* compose 帶入預設角色 */
+const _cmp50=SCREENS.compose;
+SCREENS.compose=(a)=>{
+ const el=_cmp50(a);
+ if(a&&a.role)setTimeout(function(){
+  const inp=$('#role',el)||$('[data-k="role"]',el)||$('input',el);
+  if(inp&&!inp.value){inp.value=a.role;inp.dispatchEvent(new Event('input',{bubbles:true}))}},30);
+ return el};
+
+/* ═════ 洞察主體重寫：每段都有下一步 ═════ */
+function insightsCore(){
+ const cs=S.contacts;
+ if(cs.length<3)return '<div class="empty">'+ico('grid',40,'#C8C8D0',1.4)
+  +'<div class="t">再收 '+(3-cs.length)+' 張就能分析</div>'
+  +'<div style="margin-top:20px"><button class="btn sm" data-act="camera" style="margin:0 auto">去拍名片</button></div></div>';
+ const CH=changes(),I=netIntel(),H=hubs();
+ const T=[0,0,0,0];cs.forEach(function(c){T[tierOf(c)]++});
+ const sleepers=cs.filter(function(c){return tierOf(c)>=2}).slice(0,3);
+
+ return '<div class="pad" style="padding-bottom:28px">'
+ /* 時機 */
+ +seasonHTML()
+ /* 本週變化 */
+ +'<div class="sec"><b>本週變化</b><span style="font-family:var(--fe);font-size:12.5px;color:var(--ink3);margin-left:8px">'+CH.length+'</span></div>'
+ +(CH.length?CH.slice(0,4).map(function(x){
+   const cta=x.k==='post'?'幫他引薦':x.k==='org'?'看動態':'打招呼';
+   return '<button '+(x.id?'data-post="'+esc(x.id)+'"':'data-c="'+esc(x.c.id)+'"')+' style="width:100%;text-align:left;display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--hair)">'
+   +((x.k==='org'||x.k==='news')&&x.c.company?orgAvatar(x.c.company,x.c.material,38):faceOf(x.c,38))
+   +'<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;letter-spacing:-.01em">'+esc(x.t)+'</div>'
+   +'<div style="font-size:12.5px;color:var(--ink3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(x.s)+'</div></div>'
+   +'<span style="font-size:12.5px;font-weight:700;color:var(--mang);flex:0 0 auto">'+cta+' →</span></button>'}).join('')
+  :'<div style="font-size:13px;color:var(--ink3);padding:4px 0">這週沒有變化。發一則需求，讓人脈動起來 → <button class="tx" data-act="compose" style="padding:0">發需求</button></div>')
+ /* 你的網路 */
+ +'<div class="sec"><b>你的網路</b></div>'
+ +'<div id="dimTabs" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>'
+ +'<div id="dimBox"></div>'
+ /* 引路人 */
+ +'<div class="sec"><b>引路人</b></div>'
+ +'<div style="font-size:12.5px;color:var(--ink3);margin:-6px 0 6px;line-height:1.7">唯一窗口、決策層、正在找人的人——請他引薦，比你自己敲門快三倍。</div>'
+ +H.map(function(x){
+   const why=[(x.c.level==='決策層'?'決策層':x.c.level==='高階主管'?'高階':''),(cs.filter(function(k){return k.company===x.c.company}).length===1&&x.c.company?'你在'+shortCo(x.c.company)+'的唯一窗口':''),(S.posts.some(function(p){return p.by===x.c.id})?'正在找人':'')].filter(Boolean).join(' · ');
+   return '<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--hair)">'
+   +'<button data-c="'+x.c.id+'" style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;text-align:left">'+faceOf(x.c,38)
+   +'<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">'+esc(x.c.name)+'</div>'
+   +'<div style="font-size:12px;color:var(--ink3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(why||idLine(x.c))+'</div></div></button>'
+   +'<button class="btn tt sm" data-draft="ask:'+x.c.id+'" style="padding:8px 12px;flex:0 0 auto">請他引薦</button></div>'}).join('')
+ /* 判斷 */
+ +(function(){const D=diagnoses(I);return D.length
+   ?'<div class="sec"><b>判斷</b></div>'+D.slice(0,3).map(function(x){
+      return '<div style="padding:14px 0;border-bottom:1px solid var(--hair)"><div style="font-size:14px;font-weight:700;letter-spacing:-.01em">'+esc(x.t)+'</div>'
+      +'<div style="font-size:12.5px;color:var(--ink2);line-height:1.75;margin-top:6px">'+esc(x.d)+'</div>'
+      +'<button '+(x.act||'')+' class="btn tt sm" style="margin-top:10px">'+esc(x.fix)+'</button></div>'}).join('')
+   :''})()
+ +'</div>'}
+
+/* 維度：就地重畫，不重整頁面 */
+function drawDim(root){
+ const cs=S.contacts,I=netIntel();
+ const T=[0,0,0,0];cs.forEach(function(c){T[tierOf(c)]++});
+ const inds=[],lvs=['決策層','高階主管','中階主管'];
+ cs.forEach(function(c){const k=c.industry||'其他';if(inds.indexOf(k)<0)inds.push(k)});
+ const cell=function(r,c2){return cs.filter(function(x){return (x.industry||'其他')===r&&(x.level||'')===c2}).length};
+ let mx=1;inds.forEach(function(r){lvs.forEach(function(l){mx=Math.max(mx,cell(r,l))})});
+ let dim='',next='';
+ const sleepers=cs.filter(function(c){return tierOf(c)>=2});
+ if(INS_DIM==='value'){dim=stackBar([{n:'核心',v:T[0],c:'var(--ink)'},{n:'活躍',v:T[1],c:'var(--mang)'},{n:'沉睡',v:T[2],c:'#C4C4CC'},{n:'未啟動',v:T[3],c:'var(--fill)'}]);
+  next=sleepers.length?['沉睡 '+sleepers.length+' 位——每週喚醒 3 位，三個月後核心圈會多一倍','draft','hello:'+sleepers[0].id,'從 '+sleepers[0].name+' 開始']:['核心圈健康——把最常聊的 3 位排進本月行事曆','act','compose','發一則需求']}
+ if(INS_DIM==='industry'){dim=heat(inds,lvs,cell,mx);
+  const top=inds.slice().sort(function(a,b){return cs.filter(function(x){return (x.industry||'其他')===b}).length-cs.filter(function(x){return (x.industry||'其他')===a}).length})[0];
+  next=['你在「'+top+'」最深——同產業的需求最容易被你補上','act','compose','向這個圈子發需求']}
+ if(INS_DIM==='level'){dim=stackBar([{n:'決策層',v:cs.filter(function(c){return c.level==='決策層'}).length,c:'var(--ink)'},{n:'高階',v:cs.filter(function(c){return c.level==='高階主管'}).length,c:'var(--mang)'},{n:'中階',v:cs.filter(function(c){return c.level==='中階主管'}).length,c:'#9C9CF5'},{n:'其他',v:cs.filter(function(c){return !c.level}).length,c:'var(--fill)'}]);
+  const dm=cs.filter(function(c){return c.level==='決策層'});
+  next=dm.length?['決策層 '+dm.length+' 位——他們是最值得寫提案的人','c',dm[0].id,'看 '+dm[0].name]:['還沒有決策層——請引路人幫你介紹','act','compose','發需求找決策者']}
+ if(INS_DIM==='live'){dim=stackBar([{n:'深聊',v:I.active,c:'var(--turq)'},{n:'說過話',v:I.talked-I.active,c:'var(--mang)'},{n:'沒說過',v:I.n-I.talked,c:'var(--fill)'}]);
+  const silent=cs.filter(function(c){return !S.threads.some(function(t){return t.with===c.id&&t.msgs&&t.msgs.length})});
+  next=silent.length?[silent.length+' 位還沒說過話——名片換了不說話，就只是一張紙','draft','hello:'+silent[0].id,'跟 '+silent[0].name+' 說第一句']:['每個人都說過話了，很少人做得到','act','compose','發需求']}
+ $('#dimTabs',root).innerHTML=Object.keys(INS_DIMS).map(function(k){const on=INS_DIM===k;
+  return '<button data-dim="'+k+'" style="font-size:12.5px;font-weight:'+(on?700:400)+';padding:7px 14px;border-radius:99px;background:'+(on?'var(--ink)':'var(--fill)')+';color:'+(on?'#fff':'var(--ink2)')+'">'+INS_DIMS[k]+'</button>'}).join('');
+ const attr=next[1]==='draft'?'data-draft="'+next[2]+'"':next[1]==='c'?'data-c="'+next[2]+'"':'data-act="'+next[2]+'"';
+ $('#dimBox',root).innerHTML=dim+'<div style="display:flex;align-items:center;gap:12px;margin-top:16px;padding:12px 14px;border-radius:12px;background:var(--fill)"><span style="flex:1;font-size:12.5px;line-height:1.6;color:var(--ink2)">'+esc(next[0])+'</span><button class="btn sm" '+attr+' style="flex:0 0 auto;padding:8px 12px">'+esc(next[3])+'</button></div>'}
+
+/* 攔掉舊的 data-dim 整頁重整：改成就地重畫 */
+document.addEventListener('click',function(e){
+ const d=e.target.closest('[data-dim]');if(!d)return;
+ e.stopPropagation();e.preventDefault();
+ INS_DIM=d.dataset.dim;
+ const root=d.closest('.scr')||document;drawDim(root)},true);
+
+/* Pro 鎖：真的內容模糊，上面一張卡；升級走 upsell */
+insights2=function(){
+ const inner=insightsCore();
+ const withC=inner+(typeof contribHTML==='function'?contribHTML():'');
+ setTimeout(function(){const root=document.querySelector('#dimBox')&&document.querySelector('#dimBox').closest('.scr');if(root)drawDim(root)},0);
+ if(isPro())return withC;
+ return '<div style="position:relative">'
+ +'<div style="filter:blur(6px);opacity:.55;pointer-events:none;user-select:none;max-height:720px;overflow:hidden">'+withC+'</div>'
+ +'<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.92) 38%,#fff 100%)"></div>'
+ +'<div style="position:absolute;top:150px;left:20px;right:20px;padding:22px;background:#fff;border:1px solid var(--e6);border-radius:18px;box-shadow:0 12px 32px rgba(20,20,28,.10)">'
+ +tierPill('pro')
+ +'<div style="font-size:20px;font-weight:800;letter-spacing:-.03em;margin-top:8px;line-height:1.35">讓人脈會思考</div>'
+ +'<div style="font-size:14px;color:var(--ink2);line-height:1.8;margin-top:8px">這 '+S.contacts.length+' 位人脈裡，現在該找誰、說什麼、為誰寫提案——每一條洞察都附下一步。</div>'
+ +'<button class="btn" data-upsell="pro" style="margin-top:16px;background:#111">看 Pro，NT$179／月起</button></div></div>'};
+document.addEventListener('click',function(e){const u=e.target.closest('[data-upsell]');if(u)upsell(u.dataset.upsell)});
+
+/* ═════ 商業提案（Pro）═════ */
+function proposalFor(c){
+ const me=S.curCard()||{};
+ const O=(typeof orgOf==='function')?orgOf(c.company,c):null;
+ const hp=S.posts.filter(function(p){return p.by===c.id})[0];
+ const co=(typeof coopAnalysis==='function')?coopAnalysis(c):{t:'',d:''};
+ const ss=seasonNow()[0];
+ const coName=c.company?shortCo(c.company):c.name;
+ return {
+  title:'給 '+c.name+'：'+(me.offer?me.offer.split(/[、,，]/)[0]:'合作')+'提案',
+  sec:[
+   {k:'opp',t:'我看到的機會',v:[
+     (O&&O.desc)?coName+' 目前的重心是'+O.desc.replace(/。$/,'')+'。':'',
+     hp?'你公開在找「'+hp.role+'」。':'',
+     ss?ss.t+'——'+ss.w+'。':'',
+     co.lv?co.d:''].filter(Boolean).join('\n')},
+   {k:'me',t:'我能提供',v:(me.offer?me.offer+'。':'')+(me.headline?me.headline:'')||('我在'+(me.company||'目前的團隊')+'負責'+(me.title||'業務')+'相關工作。'+(O&&O.ind?'我們在'+O.ind+'客戶上的經驗，可以直接用在'+coName+'的情境。':'把我們做過的案例整理成三個可直接套用的方向給你。'))},
+   {k:'how',t:'合作方式',v:'1. 30 分鐘線上會議，釐清'+coName+'現階段最想解的一件事\n2. 兩週內給一份針對性的方案與報價\n3. 先做一個小範圍試行，成效可量化再談長期'},
+   {k:'next',t:'下一步',v:'這週或下週，哪個時段方便聊 30 分鐘？我配合你。'}]}}
+
+SCREENS.proposal=(a)=>{
+ const c=S.contact(a.id);if(!c)return screen(tbTitle('提案')+'<div class="body"></div>');
+ const P=proposalFor(c);
+ const el=screen(tbTitle('提案','<button class="tx" id="pSend">傳給他</button>')
+ +'<div class="body" style="padding-bottom:calc(30px + var(--sab))">'
+ +'<div style="background:var(--fill);padding:16px 20px;display:flex;align-items:center;gap:12px">'+faceOf(c,40)+'<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">'+esc(c.name)+'</div><div style="font-size:12px;color:var(--ink3)">'+esc(idLine(c))+'</div></div>'+tierPill('pro')+'</div>'
+ +'<div class="pad" style="padding-top:18px">'
+ +'<div class="fld"><label>標題</label><input id="pTitle" value="'+esc(P.title)+'"></div>'
+ +P.sec.map(function(s){return '<div class="fld"><label>'+s.t+'</label><textarea data-ps="'+s.k+'" rows="'+(s.k==='how'?4:3)+'">'+esc(s.v)+'</textarea></div>'}).join('')
+ +'<div style="display:flex;gap:8px;margin-top:6px"><button class="btn tt" id="pCopy" style="flex:1">'+ico('link',15,'currentColor')+'複製全文</button><button class="btn tt" id="pRegen" style="flex:1">'+ico('swap',15,'currentColor')+'AI 重寫</button></div>'
+ +'<div style="font-size:12px;color:var(--ink3);line-height:1.7;margin-top:14px">提案由 AI 依你的名片、他的公司情報與現在的時機起草。寄出永遠由你決定。</div>'
+ +'</div></div>');
+ const text=function(){return $('#pTitle',el).value+'\n\n'+$$('[data-ps]',el).map(function(t){return '【'+t.previousElementSibling.textContent+'】\n'+t.value}).join('\n\n')};
+ el.addEventListener('click',function(e){
+  if(e.target.closest('#pCopy')){try{navigator.clipboard.writeText(text())}catch(x){}toast('已複製');return}
+  if(e.target.closest('#pRegen')){const P2=proposalFor(c);$$('[data-ps]',el).forEach(function(t,i){t.value=P2.sec[i].v});toast('已重寫');return}
+  if(e.target.closest('#pSend')){
+   const th=S.threads,t=th.find(function(x){return x.with===c.id});
+   const msg={me:1,t:'我整理了一份提案：'+$('#pTitle',el).value+'——方便的話我把全文寄給你，或先聊 30 分鐘？',at:'剛剛'};
+   if(t){t.msgs.push(msg)}else th.unshift({id:uid(),with:c.id,unread:0,msgs:[msg]});
+   S.threads=th;R.back();toast(c.verified?'已傳給 '+c.name:'已存到對話，寄信時可帶上')}});
+ return el};
+
+/* 人脈頁：合作機會下面加「為他寫提案」 */
+const _ct50=SCREENS.contact;
+SCREENS.contact=(a)=>{
+ const el=_ct50(a);
+ const c=S.contact(a&&a.id);if(!c)return el;
+ setTimeout(function(){
+  const secs=$$('.sec',el);
+  const s=secs.find(function(x){return /合作機會/.test(x.textContent)});
+  if(!s||!s.nextElementSibling)return;
+  s.nextElementSibling.insertAdjacentHTML('afterend',
+   '<button data-proposal="'+c.id+'" style="width:100%;margin-top:10px;display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,#1C1C24,#0F0F14);color:#fff;text-align:left">'
+   +'<div style="width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;flex:0 0 auto">'+ico('book',18,'#F2E7C0')+'</div>'
+   +'<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">為 '+esc(c.name)+' 寫提案</div><div style="font-size:12px;color:rgba(255,255,255,.62);margin-top:2px">AI 依他的公司與現在的時機起草，你改一改就能送</div></div>'
+   +tierPill('pro')+'</button>')},0);
+ return el};
+document.addEventListener('click',function(e){
+ const p=e.target.closest('[data-proposal]');if(!p)return;
+ if(!isPro()){upsell('pro','商業提案是 Pro 的功能。AI 依對方公司與現在的時機起草，你改一改就能送。');return}
+ R.go('proposal',{id:p.dataset.proposal},'push')});
+/* ═══════════════════════════════════════════
+   v3.1 ㊶：中英雙語——同一套介面，兩種語言
+   ─────────────────────────────────────────
+   ① 語言判斷：設定裡選過就用選的；沒選過看瀏覽器（navigator.language）：
+      zh-* → 中文，其他 → English。設定頁「語言」列可以隨時切。
+   ② 作法：不改任何畫面程式，改在「渲染後」翻譯——MutationObserver 盯著 #dev，
+      新出現的文字節點、placeholder、title 逐一對照字典（完整字串比對＋
+      幾條含變數的規則）。字典裡沒有的（人名、公司名、使用者自己打的字）
+      原樣保留。這樣中英兩版永遠同一個版面、同一套邏輯，只差字。
+   ③ 正式版：字典搬到 i18n 檔（zh-TW.json / en.json），元件直接取 t(key)；
+      這裡的字典就是 en.json 的第一版。
+   ④ 英文字比中文長 20–40%：所有會爆版的地方在 v3.0 已改成允許換行或截斷，
+      切到英文用截圖對過主要 30 個畫面。
+   ═══════════════════════════════════════════ */
+
+let LANG=(function(){
+ const s=DB.get('lang','');if(s)return s;
+ const n=(navigator.language||navigator.userLanguage||'zh').toLowerCase();
+ return n.indexOf('zh')===0?'zh':'en'})();
+function setLang(l){LANG=l;DB.set('lang',l);document.documentElement.lang=l==='zh'?'zh-Hant':'en';i18nAll();
+ try{R.refresh()}catch(e){}
+ if(typeof renderShell==='function')setTimeout(renderShell,0)}
+
+const EN={
+/* 導覽／通用 */
+'尋求':'Seek','人脈':'Network','拍名片':'Scan card','訊息':'Messages','名片':'Cards','設定':'Settings','看方案':'See plans','設計':'Design','分享':'Share','公開頁':'Public page',
+'完成':'Done','儲存':'Save','套用':'Apply','編輯':'Edit','預覽':'Preview','取消':'Cancel','下一步':'Next','略過':'Skip','關閉':'Close','新增':'Add','加入':'Add','刪除':'Delete','確認':'Confirm','再想想':'Not now','先看看就好':'Just looking','登入':'Log in','登出':'Log out','搜尋':'Search','全部':'All','更多':'More','複製':'Copy','複製全文':'Copy all','複製連結':'Copy link','分享名片':'Share card','出示 QR':'Show QR','必填':'required','可略過':'optional','未填':'—','使用中':'Current','目前使用中':'In use','這台':'This','這台裝置':'This device','現在':'Now','升級後':'After upgrade','免費':'Free','免費款':'Free style','年繳':'Yearly','月繳':'Monthly','訂閱':'Subscription','方案':'Plans','通知':'Notifications','動態':'Feed','我的':'Mine','對話':'Conversations','新訊息':'New message','傳訊息':'Message','撥號':'Call','寄信':'Email','開場':'Opener','打招呼':'Say hi','推薦':'Recommend','推薦人選':'Recommend someone','幫他引薦':'Refer someone','請他引薦':'Ask for intro','看動態':'View post','發需求':'Post a request','發布':'Post','發一則需求':'Post a request','去拍名片':'Scan a card','先跳過':'Skip for now','看這則需求':'View request','回到尋求人脈':'Back to Seek','已交換':'Exchanged','交換完成':'Exchange complete','交換名片':'Exchange cards','存到通訊錄':'Save to contacts','聯絡與連結':'Contact & links','官網':'Website','公司':'Company','姓名':'Name','英文名':'English name','職稱':'Title','部門':'Department','手機':'Mobile','電話':'Phone','公司電話':'Office phone','地址':'Address','網址':'Website','公司網址':'Company website','公司 Logo':'Company logo','名片名稱':'Card name','材質':'Material','一句話介紹':'One-liner','自訂區塊':'Custom blocks','大頭貼':'Photo','人會忘記名字，但看到臉會想起來':'People forget names, not faces','即時預覽':'Live preview','改下面的欄位，這張卡會跟著動。空的欄位不留佔位。':'Edit the fields below and the card updates. Empty fields leave no gaps.','公司任職':'Company','個人工作室':'Studio','獨立接案':'Freelance','工作室名稱':'Studio name','專業定位':'What you do','服務項目':'Services','已從名片辨識帶入，看一眼有沒有錯字':'Filled from your card scan — check for typos','編輯基本資料':'Edit basics','你的名片':'Your card','更多資料':'More details',
+/* 首頁 */
+'搜尋，或直接問我一句話':'Search, or just ask me','名單':'People','洞察':'Insights','最近認識':'Recently met','最近認識 ↓':'Recently met ↓','Heycard 用戶':'Heycard users','該打招呼了':'Say hi','新創聚會':'Startup meetup','值得深聊':'Worth a deep talk','高潛力':'High potential','正在找':'Looking for','收 10 張名片':'Collect 10 cards','人脈越多，AI 判斷越準':'More contacts, sharper AI','分享給 10 人':'Share with 10 people','讓每一次握手都留得下來':'Make every handshake count','說出你在找誰，人脈才會動':'Say who you need and your network moves','把名片分享給 10 位朋友':'Share your card with 10 friends','發一則找人脈的需求':'Post a request','分享名片':'Share card',
+/* 歡迎／登入 */
+'讓每一次握手都有價值。':'Make every handshake count.','交換名片只是開始。加入 Heycard，開啟合作的想像。':'A card is just the start. Join Heycard and imagine what you could build together.','建立我的名片':'Create my card','我已經是會員，登入':'I have an account — log in','歡迎回來':'Welcome back','用你註冊時的 Email 登入':'Log in with the email you signed up with','密碼':'Password','改用驗證碼':'Use a code instead','忘記密碼':'Forgot password','驗證碼登入':'Log in with a code','你的 Email':'Your email','我們會寄 6 位數驗證碼給你，不需要密碼。':'We\'ll email you a 6-digit code. No password needed.','寄驗證碼給我':'Send me a code','輸入驗證碼':'Enter the code','我們寄了 6 位數字到':'We sent a 6-digit code to','重新寄送':'Resend','更改 Email':'Change email','重設密碼':'Reset password','我們會寄重設密碼的連結給你。':'We\'ll email you a reset link.','寄連結給我':'Send me a link','建立帳號':'Create account','這會是你未來的登入帳號。建議用你長期持有的信箱。':'This will be your login. Use an email you\'ll keep.','我已閱讀並同意':'I agree to the','服務條款':'Terms','與':'and','隱私權政策':'Privacy Policy','驗證':'Verify','設定密碼':'Set a password','密碼 8 碼以上，含英文與數字':'8+ characters with letters and numbers','原型：新裝置會要求 Email 驗證碼':'Prototype: new devices ask for an email code','原型：任意 6 位數字都可以':'Prototype: any 6 digits work',
+/* 建卡／相機 */
+'建立名片':'Create card','第一張名片':'Your first card','兩分鐘。之後隨時能改。':'Two minutes. Change anything later.','拍實體名片':'Scan your paper card','正反面各一張，自動辨識中英文':'Front and back — Chinese and English recognized','自己輸入':'Type it in','只有姓名必填':'Only your name is required','正面':'Front','反面':'Back','開相機':'Camera','旋轉':'Rotate','把名片正面放進框裡':'Put the front of the card in the frame','翻面，拍反面（沒有可以略過）':'Flip it — back side (skip if none)','正面拍好了':'Front captured','反面拍好了':'Back captured','重拍':'Retake','下一步：拍反面':'Next: back side','開始辨識':'Recognize','偵測到橫向名片，取景框已轉向':'Landscape card detected — frame rotated','偵測到橫向名片':'Landscape card detected','正在辨識中英文與欄位':'Reading text and fields','辨識完可以逐欄確認，改到對為止':'You can check every field afterwards','把名片放進框裡':'Put the card in the frame','對準對方的 Heycard QR':'Aim at their Heycard QR','QR Code':'QR Code','你的名片好了':'Your card is ready','接下來三步，把它變成真的人脈。':'Three steps to turn it into a real network.','開始第一步':'Start step one','確認 1 張名片':'Confirm 1 card','已好':'Good','全部收錄':'Save all','沒問題的那幾張已自動收錄，不用再看一次':'The clean ones are saved already','原型：OCR 為模擬資料':'Prototype: OCR is simulated','第 1 / 1 張':'1 of 1','改右邊的欄位，左邊會同步變動。琥珀色的是辨識信心低、需要你看一眼的。':'Edit on the right, the card updates on the left. Amber = low confidence, take a look.','＋ 場域':'+ Venue',
+/* 洞察 */
+'時機':'Timing','本週變化':'This week','你的網路':'Your network','引路人':'Door-openers','判斷':'Assessment','互相':'Give & get','價值':'Value','產業':'Industry','層級':'Level','活躍':'Activity','核心':'Core','沉睡':'Dormant','未啟動':'Untouched','深聊':'Deep','說過話':'Talked','沒說過':'Silent','決策層':'Decision makers','高階主管':'Senior','中階主管':'Mid-level','高階':'Senior','中階':'Mid','其他':'Other','科技業':'Tech','餐飲':'F&B','金融':'Finance','行銷':'Marketing','製造業':'Manufacturing','電商':'E-commerce','零售':'Retail','物流':'Logistics','唯一窗口、決策層、正在找人的人——請他引薦，比你自己敲門快三倍。':'Sole contacts, decision makers, people hiring — an intro from them beats cold-knocking three to one.','正在找人':'hiring','我給出的':'Given','我收到的':'Received','給出':'Given','收到':'Received','成立引薦':'Intros landed','收到感謝':'Thanks received','收到推薦':'Recommendations received','我發的需求':'My requests','你收得比給得多。挑一則需求推薦人選，往返才會持續。':'You receive more than you give. Recommend someone and the flow keeps going.','讓人脈會思考':'A network that thinks','看 Pro，NT$179／月起':'See Pro, from NT$179/mo','看 Plus，NT$79／月起':'See Plus, from NT$79/mo','向這個圈子發需求':'Post to this circle','發一則需求，補上下游':'Post a request to fill the gap','這週沒有變化。發一則需求，讓人脈動起來 →':'Nothing changed this week. Post a request to get things moving →','看動態 →':'View →','幫他引薦 →':'Refer →','打招呼 →':'Say hi →','再收 3 張就能分析':'3 more cards to unlock analysis','再收 2 張就能分析':'2 more cards to unlock analysis','再收 1 張就能分析':'1 more card to unlock analysis','那個人離職，那條線就斷了。':'If that person leaves, the line goes dead.','同一產業景氣下行時，你的人脈會一起失溫。':'When one industry cools, your whole network cools with it.','還有人沒有備註':'Some contacts have no notes','名片欄位只說明他是誰，說不出他要什麼——AI 的判斷準確度直接受限於此。':'A card says who they are, not what they need — and that caps how sharp the AI can be.',
+'Q3 底：企業開始編明年預算':'Late Q3: next year\'s budgets are being set','預算在九月底前定案，現在進去才排得進明年':'Budgets lock by end of September — get in now to be in next year\'s plan','年初人事與預算啟動':'New year: teams and budgets reset','新年度組織與預算剛定，決策者最願意聽新方案':'Org charts and budgets are fresh — decision makers are most open to new ideas','Q1 結算、展會季開跑':'Q1 close, trade-show season','第一季數字出來，補強動作會在四月啟動':'Q1 numbers are in; fixes start in April','股東會季，上市櫃公司對外說故事':'AGM season: listed companies tell their story','年報與股東會前，公司最需要案例與曝光':'Before annual reports and AGMs, companies need cases and visibility','Q4 電商與零售衝刺':'Q4 e-commerce and retail sprint','雙 11 到年末檔期，電商、零售、物流全在找支援':'From Singles\' Day to year-end, e-commerce, retail and logistics all need hands','年終：回顧與感謝的季節':'Year-end: time to reconnect and thank','一年一次最自然的問候時點，深聊過的人現在該聯絡':'The most natural moment of the year to reach out to people you\'ve talked deeply with','位正是這波的對象':'of your contacts are exactly who this wave is about','目前人脈裡還沒有這波的對象——發一則需求，讓人脈幫你找':'No one in your network fits this wave yet — post a request and let your network find them','明年度預算內的長期合作夥伴':'a long-term partner inside next year\'s budget','新年度合作夥伴':'a partner for the new year','Q2 補強專案的合作夥伴':'a partner for Q2 fixes','年度案例與曝光的協作夥伴':'a partner for annual cases and visibility','Q4 檔期的即戰力夥伴':'a ready-to-go partner for Q4','等':'and more',
+/* 人脈詳頁 */
+'Heycard 用戶 · 資料由本人維護':'Heycard user · kept up to date by them','資料由本人維護':'kept up to date by them','你的人脈裡有':'You have','位正是這波的對象':'contacts who are exactly who this wave is about','。':'.','名片掃描 · 資料不會自動更新':'Scanned card · doesn\'t update by itself','合作機會':'Collaboration','有明確的合作點':'Clear collaboration point','有弱訊號，別高估':'Weak signal — don\'t overrate it','目前沒有明顯的合作點':'No obvious collaboration point yet','你們的專業沒有直接交集。硬找題目會浪費兩邊時間——等他的動態或你的需求變了，這裡會自己更新。':'Your fields don\'t overlap directly. Forcing a topic wastes both sides\' time — this updates when their feed or your needs change.','AI 依他的公司與現在的時機起草，你改一改就能送':'AI drafts from their company and today\'s timing — tweak and send','旗下產品與網站':'Products & sites','產品':'Product','網站':'Site','負責人':'Representative','設立':'Founded','資本額':'Capital','登記地址':'Registered address','公司動態':'Company update','他公開的':'They shared','名片資料':'Card details','你記的':'Your notes','認識':'Met','場域':'Venue','備註':'Notes','你們聊了什麼':'What you talked about','用講的':'Speak it','聽你說⋯':'Listening…','不用組織語言，想到什麼寫什麼':'No need to polish — jot anything','公示登記':'Public registry','經濟部商業司':'Dept. of Commerce, MOEA','統一編號':'Tax ID','員工數':'Employees','你認識的人':'People you know','近期消息':'Recent news','自官網與公開資料':'From website & public sources','你手上的資料在過期':'Your info is going stale','AI 開場':'AI opener','看那則動態':'View that post','資料更新':'Update available','會更新的欄位':'Fields that will update','沒有變動':'No change','你記的會保留':'Your notes stay','認識時間、場域、你寫的備註都不會被覆蓋。':'When you met, where, and your notes are never overwritten.','套用更新':'Apply update','邀請加入':'Invite',
+/* 尋求 */
+'你':'You','在找':'Looking for','徵求':'Seeking','徵求合作':'Seeking partners','可以提供':'Offering','我可以推薦':'I can recommend','我們可以談':'Let\'s talk','我需要這個':'I need this','有興趣':'Interested','看 2 則推薦':'2 recommendations','我在找':'I\'m looking for','我可以提供':'I can offer','先填角色就能發，其他都可略過。':'Just fill in the role to post; the rest is optional.','身分／角色':'Who / role','地區':'Region','誰看得到':'Who can see','我選的人':'People I pick','只有你挑的幾位看得到':'Only the people you choose','一度人脈':'1st-degree','跟你交換過名片的人':'People who exchanged cards with you','補充':'Details','不寫也能發。這段由你自己寫，AI 不代筆。':'Optional. This part is yours — AI doesn\'t write it.','講清楚背景，推薦人才知道該推誰':'Give context so recommenders know who to suggest','這則需求已經不在了。':'This request is gone.','推薦已送出':'Recommendation sent','已送出引薦邀請':'Intro invitation sent','接下來會發生什麼':'What happens next','被推薦人':'The person recommended','看到引薦卡，決定有沒有興趣':'sees an intro card and decides if they\'re interested','需求人':'The requester','決定要不要採用你的推薦':'decides whether to take your recommendation','你（推薦人）':'You (recommender)','一旦成立，你會收到通知，對方也會向你道謝':'once it lands you\'re notified and they can thank you','成立次數與收到的感謝會記在「尋求」頁。':'Intros landed and thanks received show on the Seek page.','引薦邀請':'Intro invitation','想把你介紹給':'wants to introduce you to','有興趣，交換名片':'Interested — exchange cards','不方便':'Not now','拒絕不會通知對方是誰拒絕的':'Declining doesn\'t reveal who declined','這時候':'At this point','還看不到聯絡方式':'no contact details are shown','—— 只有姓名、公司、職稱與推薦理由。兩邊都說好，才交換。':'— only name, company, title and the reason. Cards exchange only when both say yes.','雙北':'Taipei','全台':'Taiwan-wide','電商 · 物流':'E-commerce · Logistics',
+/* 訊息 */
+'該聯絡的人':'People to reach','他在找人，你認得':'They\'re hiring — you know someone','他正在找人':'They\'re looking','還有 1 位':'1 more','傳給：':'To:','你的人脈':'Your network','搜尋人脈':'Search contacts','訊息⋯':'Message…','原型：對方不會真的回覆':'Prototype: no real replies','昨天':'Yesterday','剛剛':'Just now',
+/* 名片頁 */
+'名片正面':'Card front','換到名片的人都看得到':'Everyone you exchange with sees this','完整檔案':'Full profile','加你為人脈的人看得到，也用在你的公開頁':'Visible to your contacts and on your public page','只有你看得到':'Only you','不對外，只給 AI 判讀合作機會':'Private — used only by AI to spot collaboration','我正在找':'I\'m looking for','升級後：拿掉標記、自由配色 →':'Upgrade: remove the mark, pick your tone →','試試色調與去標記 →':'Try tones and no mark →','試試字色與字體 →':'Try ink and fonts →','Plus 設計':'Plus design','Pro 設計':'Pro design','只給這一張':'Just this card','給完整檔案':'Full profile','2 個身分，對方可自己切換':'2 identities — they can switch','不管給一張還是給完整檔案，出口都是同兩顆按鈕。習慣一次建立就好。':'One card or full profile, same two buttons. Learn it once.','對方會看到':'They\'ll see','預覽名片頁':'Preview page','單張名片 · 讓對方掃這個':'Single card · let them scan this','原型：圖案為示意，非可掃描 QR':'Prototype: sample pattern, not a real QR','改成掃描對方':'Scan theirs instead','對方看到的樣子':'What they see','建立你自己的名片':'Create your own card','當前身分':'Current identity','切換':'Switch','交換與收錄都會用這張':'Used for exchanges and scans','我的名片':'My cards','新名片':'New card',
+/* 設計器 */
+'設計名片':'Design card','款式':'Styles','版式':'Layout','色調':'Tone','標記':'Mark','字色':'Ink','字體':'Font','銀霧':'Silver Mist','曜黑':'Obsidian','極光':'Aurora','錳藍':'Manganese','玫瑰金':'Rose Gold','香檳':'Champagne','墨綠':'Deep Green','湖水':'Lake','暮紫':'Dusk','典藏':'Archive','經典':'Classic','置中':'Centered','極簡':'Minimal','上方':'Top','公司名旁':'By company name','銀':'Silver','鋼':'Steel','霧':'Mist','錳':'Manganese','先在自己的名片上試，喜歡再升級帶走':'Try it on your own card — upgrade to keep it','隱藏名片上的 Heycard 標記':'Hide the Heycard mark','你的名片，只有你的品牌':'Your card, only your brand','這種材質合得來的字色':'Ink colors that suit this material','永':'Aa','預設':'Default','深錳':'Deep Mn','深藍':'Navy','赭':'Ochre','深灰':'Charcoal','純白':'White','墨黑':'Ink black','金':'Gold','薄荷':'Mint','淡錳':'Light Mn','自訂顏色':'Custom color','現代':'Modern','簡約':'Light','Taipei Sans，VI 標準':'Taipei Sans, VI standard','宋體，穩重、有年資感':'Serif — steady, seasoned','細體、寬字距，留白多':'Thin, wide-set, airy','用到':'Uses','升級並套用':'Upgrade & apply','先上傳公司 Logo':'Upload your logo first','已套用':'Applied',
+/* 方案／付款 */
+'名片是你的':'Your card is yours','人脈會思考':'A network that thinks','拿掉標記、自由配色——名片是你的':'No mark, your tone — the card is yours','字色、字體、洞察與 AI——人脈會思考':'Ink, fonts, insights and AI — a network that thinks','現在的名片，已經很好用':'Your card today is already great','（目前方案）':'(current plan)','現在的名片，已經很好用（目前方案）':'Your card today is already great (current plan)','字色、字體、洞察與 AI——人脈會思考（目前方案）':'Ink, fonts, insights and AI — a network that thinks (current plan)','免費就有':'Free includes','多張名片、多重身分':'Multiple cards and identities','收名片、人脈、訊息、尋求全部免費':'Scanning, network, messages and Seek — all free','5 種材質、3 種版式':'5 materials, 3 layouts','AI 搜尋每月 20 次':'20 AI searches a month','名片上不再有 Heycard 標記':'No Heycard mark on your card','只有你的品牌':'Only your brand','自由配色':'Free color tone','色調由你決定':'You pick the tone','所有款式解鎖':'All styles unlocked','含色調款式':'including toned styles','洞察全開':'Full insights','人脈的結構、變化、往返':'Structure, changes and give-and-take of your network','AI 搜尋 ×10':'10× AI searches','每月 200 次':'200 a month','名片字色與字體':'Card ink and fonts','每種材質一組合得來的顏色':'A matching palette per material','年繳送 NFC 實體卡':'Yearly plan ships an NFC card','一碰就交換':'Tap to exchange','含 Plus 全部功能':'Everything in Plus','省 2 個月':'save 2 months','省 2 個月 · 送 NFC 卡':'save 2 months · NFC card','移除 Heycard 標記':'Remove Heycard mark','所有款式':'All styles','字色與字體':'Ink & fonts','AI 搜尋／月':'AI searches / mo','NFC 實體卡':'NFC card','年繳送':'Yearly','隨時可以取消，用到期末為止。':'Cancel anytime; you keep access to the end of the period.','訂閱在 heycard.app 完成，不經 App Store。':'Subscriptions are handled on heycard.app, not the App Store.','繼續用免費版':'Keep using Free','已包含在 Pro':'Included in Pro','目前是 Pro（年繳）':'You\'re on Pro (yearly)','目前是 Plus（年繳）':'You\'re on Plus (yearly)','目前是 Pro（月繳）':'You\'re on Pro (monthly)','目前是 Plus（月繳）':'You\'re on Plus (monthly)','heycard.app／checkout · 安全付款':'heycard.app/checkout · secure payment','訂閱 Plus':'Subscribe to Plus','訂閱 Pro':'Subscribe to Pro','Plus 年繳':'Plus · yearly','Plus 月繳':'Plus · monthly','Pro 年繳':'Pro · yearly','Pro 月繳':'Pro · monthly','下次扣款：一年後 · 隨時取消':'Next charge in a year · cancel anytime','下次扣款：一個月後 · 隨時取消':'Next charge in a month · cancel anytime','付款方式':'Payment','信用卡／簽帳卡':'Credit / debit card','原型：不會真的扣款':'Prototype: no real charge','付款由 heycard.app 處理，不經 App Store。付款完成會自動回到 App。':'Payment is handled by heycard.app, not the App Store. You\'ll return to the app when it\'s done.','處理中…':'Processing…','名片是你的了':'The card is yours now','人脈會思考了':'Your network thinks now','標記已可拿掉，色調由你決定':'You can remove the mark and pick your tone','去設計名片':'Design my card','回到我的名片':'Back to my cards','NFC 實體卡 ×1（寄到名片上的地址）':'NFC card ×1 (shipped to the address on your card)','贈送':'Free','拿掉名片上的 Heycard 標記、自由配色。你的名片，只有你的品牌。':'Remove the Heycard mark and pick your tone. Your card, only your brand.','拿掉 Heycard 標記、自由配色，NT$79／月起':'No mark, your tone — from NT$79/mo','洞察全開、AI 搜尋 200 次／月、年繳送 NFC 卡':'Full insights, 200 AI searches/mo, NFC card on yearly','洞察全開、AI 搜尋 ×10、字色與字體，年繳送 NFC 卡。':'Full insights, 10× AI searches, ink & fonts, NFC card on yearly.','全部功能已開。感謝你讓人脈會思考。':'Everything is on. Thanks for letting your network think.','NT$79／月起':'From NT$79/mo','NT$179／月起':'From NT$179/mo','看 Pro':'See Pro','洞察、AI 與字色字體，都在 Pro':'Insights, AI, ink and fonts — all in Pro','拿掉標記、自由配色，都在 Plus':'No mark, your tone — all in Plus','這張設計用到了字色與字體，升級 Pro 就能帶走':'This design uses ink and fonts — upgrade to Pro to keep it','這張設計用到了色調或去標記，升級 Plus 就能帶走':'This design uses a tone or no mark — upgrade to Plus to keep it','商業提案是 Pro 的功能。AI 依對方公司與現在的時機起草，你改一改就能送。':'Proposals are a Pro feature. AI drafts from their company and today\'s timing — tweak and send.',
+/* 設定 */
+'帳號':'Account','帳號安全':'Security','兩步驟驗證、登入裝置':'Two-step verification, devices','你的人脈看得到你什麼':'What your contacts see','透明度說明':'Transparency','隱私':'Privacy','允許我的人脈推薦我':'Let my contacts recommend me','關閉後不會出現在新的引薦中':'When off, you won\'t appear in new intros','名片更新通知':'Card update alerts','有人更新名片時通知我':'Notify me when someone updates their card','資料':'Data','匯出我的人脈':'Export contacts','CSV 檔，可直接下載':'CSV, downloads directly','清除所有資料，重新開始':'Erase everything and start over','關於':'About','分享與轉發':'Sharing & forwarding','轉發規則':'Forwarding rules','語言':'Language','中文':'中文','兩步驟驗證':'Two-step verification','新裝置登入需 Email 驗證碼':'New devices need an email code','登入通知':'Login alerts','有新裝置登入時通知我':'Notify me of new device logins','生物辨識解鎖':'Biometric unlock','Face ID / 指紋':'Face ID / fingerprint','登入中的裝置':'Signed-in devices','原型：裝置清單為示範資料':'Prototype: sample device list','AI 搜尋每月 20 次 · 升級開啟洞察與名片自訂':'20 AI searches/mo · upgrade for insights and card design','名片已是你的 · 升級 Pro 開啟洞察':'Your card is yours · upgrade to Pro for insights','洞察全開 · AI 搜尋每月 200 次 · NFC 卡':'Full insights · 200 AI searches/mo · NFC card','洞察全開 · AI 搜尋每月 200 次':'Full insights · 200 AI searches/mo','判準是一句話：':'One rule:','你在場的事可以講，你不在場的事不要講。':'Say what happened when you were there. Never what happened when you weren\'t.','他們看得到':'They can see','你們何時、在哪裡認識':'When and where you met','你們有幾位共同人脈':'How many mutual contacts you have','你認識之後的職涯異動':'Career moves after you met','你的驗證標記':'Your verified mark','你給他的那張名片':'The card you gave them','他們看不到':'They can\'t see','你總共有多少位人脈':'How many contacts you have','你跟誰交換過名片':'Who else you\'ve exchanged with','你的名片被看過幾次':'How many times your card was viewed','你認識他之前的工作經歷':'Their career before you met','你寫的備註與標籤':'Your notes and tags','對稱原則':'Symmetry rule','你看得到關於對方的哪一項事實，他就看得到關於你的同一項。我們不做「誰看過我的名片」這種單向觀察的功能。':'Whatever fact you can see about them, they can see about you. We don\'t build one-way features like "who viewed my card".',
+/* 草稿／AI */
+'需求':'Request','AI 擬稿':'AI draft','用這個':'Use this','這次開口的依據':'Why now','剛認識，先打招呼':'Just met — say hi','你們剛換過名片但還沒說過話。第一句訊息的目的不是推銷，是讓對方把臉和名字對起來。':'You\'ve exchanged cards but not words yet. The first message isn\'t a pitch — it helps them put a face to your name.','三種寫法':'Three versions','可再修改':'editable','自然':'Natural','直接':'Direct','給對方一個開口的理由':'Give them a reason to reply','AI 只用':'AI only uses','你自己記下的資料':'what you recorded yourself','擬稿——名片欄位、你寫的備註、你們在哪裡認識。它不會替你編造你們之間沒發生過的事。':'to draft — card fields, your notes, where you met. It never invents things that didn\'t happen.','原型：規則生成，非真實 LLM':'Prototype: rule-based, not a real LLM','幫我寫第一則訊息':'Write my first message','記一下你們聊了什麼':'Note what you talked about','AI 的判讀依據':'What AI reads','「你做什麼」這一組不會出現在名片正面，但交換名片後，AI 就是靠它判斷你們能怎麼合作。':'"What you do" isn\'t printed on the card, but after an exchange it\'s how AI figures out how you could work together.','你做什麼':'What you do','這一組決定 AI 能不能替你找到合作機會':'This decides whether AI can find collaborations for you','別人最先要的':'What people need first','沒有這些，名片頁等於死的':'Without these, the card page is dead','讓人找得到你':'Be findable','官網與社群是第二次接觸的入口':'Website and socials are the second touchpoint','品牌官網':'Brand site','補足身分':'Complete the picture','大公司裡，部門比職稱更能定位你':'In big companies, department says more than title','我做什麼、幫誰解決什麼':'What I do, for whom','用郵件 App 寄出':'Send with Mail app','AI 擬稿，寄出前請自己看過':'AI draft — read before sending','附上 Heycard 署名與邀請':'Add Heycard signature and invite','他點開就能看到你的名片':'They can open your card from it','收件人':'To','主旨':'Subject',
+/* 提案 */
+'提案':'Proposal','傳給他':'Send','我看到的機會':'The opportunity I see','我能提供':'What I can offer','合作方式':'How we\'d work','AI 重寫':'Rewrite with AI','提案由 AI 依你的名片、他的公司情報與現在的時機起草。寄出永遠由你決定。':'Drafted by AI from your card, their company intel and today\'s timing. Sending is always your call.','標題':'Title','已複製':'Copied','已重寫':'Rewritten',
+/* 通知 */
+'好消息':'Good news','要你行動':'Needs you','只是告知':'FYI','今天認識的人還沒寫備註':'No notes yet on today\'s new contact','趁記憶還新，講兩句就好':'While it\'s fresh — two lines is enough','語音補上':'Add by voice','晚點再說':'Later','原型：示範通知':'Prototype: sample notifications','本週 · 5 天前':'This week · 5 days ago',
+/* 轉發規則 */
+'你在場的交換直接成立。你不在場的那一次，由這裡的規則替你決定。':'Exchanges you\'re present for just happen. For the ones you\'re not, these rules decide.','被轉發時':'When forwarded','轉發連結只給公開版':'Forwarded links get the public version','手機、公司電話、地址不會出現':'Mobile, office phone and address are hidden','第三人要完整版時通知我':'Tell me when a third party wants the full version','會告訴你是誰轉的':'You\'ll see who forwarded it','完全禁止轉發':'No forwarding','連結只有第一手能開':'Only the original recipient can open the link','為什麼不做「每次都要同意」':'Why not "approve every time"','實體名片沒有同意這個步驟。你遞出去，對方就收下了——中間多一道確認，只會讓交換變慢、讓人覺得被審查。':'Paper cards have no approval step. You hand it over, they take it — an extra confirmation only slows things down and feels like vetting.','真正需要保護的不是「誰收到你的名片」，而是':'What needs protecting isn\'t "who received your card" but','「哪些欄位跟著跑」':'"which fields travel with it"','。所以我們不擋人，只分層：你在場，全給；你不在場，給公開的那一層。':'. So we don\'t block people, we layer: present, everything; absent, the public layer.','還沒有區塊':'No blocks yet','連結或內容':'Link or content','我的作品集':'My portfolio',
+/* sheet／其他 */
+'登出？':'Log out?','清除所有資料？':'Erase all data?','已加入並套用':'Added and applied','已開通':'Activated','已傳給':'Sent to','已存到對話，寄信時可帶上':'Saved to the conversation — attach it when you email','原型：改用手動輸入示範':'Prototype: showing manual entry','無法開啟相機，改用模擬拍攝':'Camera unavailable — simulating','已雙向交換名片':'Cards exchanged both ways','沒問題':'OK','了解':'Got it'
+};
+
+/* 含變數的規則 */
+const EN_RX=[
+ [/^看 (.+)$/,'View $1'],[/^(\d+) 個身分$/,'$1 identities'],[/^，而你的「(.+)」正好接得上$/,' — and your "$1" fits right in'],[/^從 (.+) 開始$/,'Start with $1'],[/^跟 (.+) 說第一句$/,'Say the first word to $1'],[/^幫 (.+) 補一句$/,'Add a note on $1'],
+ [/^為 (.+) 寫提案$/,'Write a proposal for $1'],[/^(.+) 在找人$/,'$1 is looking'],[/^(.+) 有新動態$/,'$1 posted'],[/^(.+) 剛有新動態$/,'$1 just posted'],[/^(.+) 剛有動態$/,'$1 just posted'],[/^(.+) 外部消息$/,'$1 in the news'],
+ [/^傳給 (.+)$/,'Send to $1'],[/^寄信給 (.+)$/,'Email $1'],[/^(.+) 說$/,'$1 says'],[/^(.+) 已進到你的人脈$/,'$1 is in your network'],[/^(.+) 成為 Heycard 用戶了$/,'$1 joined Heycard'],[/^(.+) 換公司了$/,'$1 changed company'],[/^你推薦的 (.+) 成立了$/,'Your intro of $1 landed'],
+ [/^任務 (\d+) \/ (\d+)$/,'Step $1 of $2'],[/^看這 (\d+) 位$/,'See these $1'],[/^看 (\d+) 則推薦$/,'$1 recommendations'],[/^(\d+) 則推薦 · (\d+) 人看過（只有你看得到）$/,'$1 recommendations · $2 views (only you see this)'],
+ [/^(\d+) 位還沒說過話——名片換了不說話，就只是一張紙$/,'$1 haven\'t talked yet — a card without a word is just paper'],[/^沉睡 (\d+) 位——每週喚醒 3 位，三個月後核心圈會多一倍$/,'$1 dormant — wake 3 a week and your core circle doubles in three months'],
+ [/^決策層 (\d+) 位——他們是最值得寫提案的人$/,'$1 decision makers — the people most worth a proposal'],[/^你在「(.+)」最深——同產業的需求最容易被你補上$/,'You\'re deepest in $1 — same-industry requests are easiest for you to fill'],
+ [/^(\d+) 家公司只有單一窗口$/,'$1 companies have a single contact'],[/^(.+)佔了 (\d+)%$/,'$1 is $2%'],[/^請 (.+) 的窗口介紹一位同事$/,'Ask your $1 contact to introduce a colleague'],
+ [/^這 (\d+) 位人脈裡，現在該找誰、說什麼、為誰寫提案——每一條洞察都附下一步。$/,'Among these $1 contacts: who to reach, what to say, who to pitch — every insight comes with a next step.'],
+ [/^(.+)——(.+)。這 (\d+) 位是這波最該聯絡的人。$/,'$1 — $2. These $3 are the people to reach in this wave.'],
+ [/^你的人脈裡有 (\d+) 位可能符合$/,'$1 in your network may fit'],[/^(\d+) 人推薦了人選$/,'$1 people recommended someone'],[/^還有 (\d+) 位$/,'$1 more'],[/^確認 (\d+) 張名片$/,'Confirm $1 cards'],[/^第 (\d+) \/ (\d+) 張$/,'$1 of $2'],
+ [/^統編 (\d+) · 約 (\d+) 人$/,'Tax ID $1 · ~$2 people'],[/^約 (\d+) 人$/,'~$1 people'],[/^(\d+) 天前$/,'$1 days ago'],[/^(\d+) 小時前$/,'$1h ago'],[/^(\d+) 週前$/,'$1 weeks ago'],[/^(\d+) 分鐘前$/,'$1 min ago'],
+ [/^公司動態 · (.+)$/,'Company update · $1'],[/^公司官網 · (.+)$/,'Website · $1'],[/^可以提供 · (.+)$/,'Offering · $1'],[/^我發的 · (.+)$/,'Mine · $1'],
+ [/^在找 (.+)$/,'Looking for $1'],[/^徵求 (.+)$/,'Seeking $1'],[/^可以提供 (.+)$/,'Offering $1'],[/^正在找 (.+)$/,'Looking for $1'],[/^發需求：(.+)$/,'Post: $1'],
+ [/^升級 (Plus|Pro) (.+)$/,'Upgrade to $1  $2'],[/^升級 (Plus|Pro)$/,'Upgrade to $1'],[/^改為 (Plus|Pro) (.+)$/,'Switch to $1  $2'],[/^付款 (.+)$/,'Pay $1'],[/^相當於每月 (.+)$/,'That\'s $1 a month'],[/^升級 (Plus|Pro) (NT\$.+)$/,'Upgrade to $1 $2'],
+ [/^NT\$([\d,]+)／年$/,'NT$$1/yr'],[/^NT\$([\d,]+)／月$/,'NT$$1/mo'],[/^年繳 · NT\$([\d,]+)／年$/,'Yearly · NT$$1/yr'],[/^月繳 · NT\$([\d,]+)／月$/,'Monthly · NT$$1/mo'],
+ [/^(\d+)月$/,function(m){return ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m[1]]||m[0]}],
+ [/^陳怡君你好|^(.+)你好，我是/,null],
+ [/^(.+) · (\d+) 天前$/,'$1 · $2 days ago'],[/^(.+) · 過去三個月$/,'$1 · past three months'],[/^(\d+) 位 · 過去三個月$/,'$1 · past three months'],
+ [/^找不到「(.+)」$/,'No results for "$1"'],[/^試試用問的：$/,'Try asking:'],[/^AI 搜尋每月 (\d+) 次$/,'$1 AI searches a month'],[/^這個月還剩 (\d+) 次 AI 搜尋$/,'$1 AI searches left this month'],
+ [/^目前是 (Plus|Pro)（(年繳|月繳)）$/,function(m){return 'You\'re on '+m[1]+' ('+(m[2]==='年繳'?'yearly':'monthly')+')'}],
+ [/^(\d+) 個身分，對方可自己切換$/,'$1 identities — they can switch'],[/^(.+) · 共同創辦人$/,'$1 · Co-founder'],[/^(.+) · 執行長$/,'$1 · CEO'],[/^(.+) · 合夥人$/,'$1 · Partner']
+];
+
+const CJK=/[一-鿿]/;
+function nrm(s){return String(s).replace(/\u3000/g,' ').replace(/\s+/g,' ').trim()}
+const EN_N={};Object.keys(EN).forEach(function(k){EN_N[nrm(k)]=EN[k]});
+function tr(s){
+ if(LANG!=='en')return s;
+ const k=nrm(s);
+ if(EN_N.hasOwnProperty(k))return EN_N[k];
+ for(let i=0;i<EN_RX.length;i++){const r=EN_RX[i];const m=k.match(r[0]);if(m){
+  if(r[1]===null)return s;
+  if(typeof r[1]==='function')return r[1](m);
+  /* 群組也翻：$1 裡若還是中文，遞迴查一次 */
+  return r[1].replace(/\$(\d)/g,function(_,n){const g=m[+n]||'';return CJK.test(g)?tr(g):g})}}
+ return s}
+
+function i18nText(n){
+ const t=n.nodeValue;if(!t||!CJK.test(t))return;
+ const k=t.trim();if(!k)return;
+ const v=tr(k);if(v!==k&&v!==nrm(k))n.nodeValue=t.replace(k,v)}
+function i18nEl(el){
+ if(el.nodeType===3){i18nText(el);return}
+ if(el.nodeType!==1)return;
+ const w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);let n;
+ while(n=w.nextNode())i18nText(n);
+ [el].concat(Array.prototype.slice.call(el.querySelectorAll('[placeholder],[title],[aria-label]'))).forEach(function(e){
+  ['placeholder','title','aria-label'].forEach(function(a){const v=e.getAttribute&&e.getAttribute(a);if(v&&CJK.test(v)){const t=tr(v);if(t!==v)e.setAttribute(a,t)}})})}
+function i18nAll(){const d=$('#dev');if(d)i18nEl(d)}
+
+(function(){
+ document.documentElement.lang=LANG==='zh'?'zh-Hant':'en';
+ const start=function(){
+  const d=$('#dev');if(!d){setTimeout(start,50);return}
+  i18nAll();
+  const mo=new MutationObserver(function(ms){
+   if(LANG!=='en')return;
+   ms.forEach(function(m){
+    if(m.type==='characterData'){i18nText(m.target);return}
+    m.addedNodes.forEach(function(n){i18nEl(n)})})});
+  mo.observe(d,{childList:true,subtree:true,characterData:true})};
+ start()})();
+
+/* 設定：語言列 */
+const _set51=SCREENS.settings;
+SCREENS.settings=()=>{
+ const el=_set51();
+ setTimeout(function(){
+  const bd=$('.body',el);if(!bd)return;
+  const secs=$$('.sec',bd);const acc=secs.find(function(x){return /帳號|Account/.test(x.textContent)});
+  const row=h('<div><div class="sec"><b>語言</b></div><div class="pl" style="padding:0;display:flex">'
+   +[['zh','中文'],['en','English']].map(function(l){const on=LANG===l[0];
+     return '<button data-lang="'+l[0]+'" style="flex:1;padding:13px;font-size:13.5px;font-weight:'+(on?700:400)+';color:'+(on?'var(--ink)':'var(--ink3)')+';'+(on?'background:var(--fill)':'')+'">'+l[1]+(on?'  ✓':'')+'</button>'}).join('')
+   +'</div><div class="tip" style="margin-top:8px">'+(LANG==='zh'?'依瀏覽器語言自動判斷，也可以在這裡改。':'Detected from your browser. Change it here anytime.')+'</div></div>');
+  if(acc)bd.insertBefore(row,acc);else bd.appendChild(row)},0);
+ return el};
+document.addEventListener('click',function(e){const b=e.target.closest('[data-lang]');if(b)setLang(b.dataset.lang)});
+/* ═══════════════════════════════════════════
+   v3.2 ㊷：語言架構照 IG／FB ＋ Heycard 用戶在人脈裡的好感度
+   ─────────────────────────────────────────
+   ① 語言（照 Instagram／Facebook 的做法）：
+      · 預設跟「裝置／瀏覽器語言」走，不問人。
+      · 設定 → 語言：一頁清單，第一項「裝置語言（預設）」，下面是支援語言，
+        選了就覆蓋、隨時可改回預設。未上線的語言灰掉標「即將推出」。
+      · Web 額外吃網址參數 ?hl=en（IG 的做法），分享連結可帶語言。
+      · 語言只影響介面文字，不影響資料；日期／數字依 locale 格式化。
+      · 正式版：key-based 字串（FBT／ICU），en.json 為第一版，
+        RTL 預留（dir 屬性）。
+   ② Heycard 用戶 vs 非用戶：差別要一眼看見、而且是「好感」不是「標籤」。
+      · 列表：用戶頭像有錳→青的細環（IG「有動態」的語意＝這個人是活的），
+        名字旁勾勾，第三行永遠有一句活資訊（正在找／可以提供／本人維護），
+        右側是可直接按的訊息鈕；非用戶是灰階字首磚＋箭頭。
+      · 詳頁：用戶名片下多一條「活資訊帶」——本人維護、更新時間、身分數、
+        公開頁；主行動除了傳訊息，還有 AI 開場與引薦。
+      · 非用戶：維持原本，重點在「邀請他加入」那張正向卡。
+   ═══════════════════════════════════════════ */
+
+/* ═════ ① 語言 ═════ */
+const LANGS=[
+ {k:'auto',n:'裝置語言（預設）',en:'Device language (default)'},
+ {k:'zh',n:'中文（繁體）',en:'中文（繁體）'},
+ {k:'en',n:'English',en:'English'},
+ {k:'ja',n:'日本語',en:'日本語',soon:1},
+ {k:'ko',n:'한국어',en:'한국어',soon:1}];
+function deviceLang(){const n=(navigator.language||'zh').toLowerCase();return n.indexOf('zh')===0?'zh':'en'}
+function langChoice(){return DB.get('lang','')||'auto'}
+/* ?hl=en：網址參數優先一次 */
+(function(){try{const hl=new URLSearchParams(location.search).get('hl');if(hl&&(hl==='en'||hl==='zh'))setLang(hl)}catch(e){}})();
+
+SCREENS.language=()=>{
+ const cur=langChoice(),dev=deviceLang();
+ const el=screen(tbTitle('語言')
+ +'<div class="body" style="padding-bottom:calc(30px + var(--sab))">'
+ +'<div class="pad" style="padding-top:8px;padding-bottom:6px;font-size:12.5px;color:var(--ink3);line-height:1.7">介面語言跟著裝置走；在這裡選了就用你選的。名片與人脈資料不會被翻譯。</div>'
+ +LANGS.map(function(l){
+   const on=cur===l.k;
+   return '<button data-pick-lang="'+l.k+'" '+(l.soon?'disabled':'')+' style="width:100%;text-align:left;display:flex;align-items:center;gap:12px;padding:15px 20px;border-bottom:1px solid var(--hair);'+(l.soon?'opacity:.45':'')+'">'
+   +'<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:'+(on?700:400)+'">'+l.n+'</div>'
+   +(l.k==='auto'?'<div style="font-size:12px;color:var(--ink3);margin-top:2px">'+(dev==='zh'?'目前偵測到中文':'Currently detected: English')+'</div>':'')
+   +(l.soon?'<div style="font-size:12px;color:var(--ink3);margin-top:2px">即將推出</div>':'')+'</div>'
+   +(on?'<span style="color:var(--mang);display:flex">'+ico('ck',18,'currentColor',2.8)+'</span>':'')+'</button>'}).join('')
+ +'</div>');
+ el.addEventListener('click',function(e){
+  const b=e.target.closest('[data-pick-lang]');if(!b||b.disabled)return;
+  const k=b.dataset.pickLang;
+  if(k==='auto'){DB.set('lang','');LANG=deviceLang();document.documentElement.lang=LANG==='zh'?'zh-Hant':'en';i18nAll();R.refresh();if(typeof renderShell==='function')setTimeout(renderShell,0)}
+  else setLang(k);
+  toast(LANG==='zh'?'已切換':'Language updated')});
+ return el};
+
+/* 設定：語言列改成 IG 式的一列進清單 */
+const _set52=SCREENS.settings;
+SCREENS.settings=()=>{
+ const el=_set52();
+ setTimeout(function(){
+  const bd=$('.body',el);if(!bd)return;
+  const secs=$$('.sec',bd);
+  const old=secs.find(function(x){return /^語言$|^Language$/.test(x.textContent.trim())});
+  if(old&&old.parentNode){const wrap=old.parentNode;const cur=LANGS.find(function(l){return l.k===langChoice()})||LANGS[0];
+   wrap.innerHTML='<div class="sec"><b>語言</b></div>'
+   +'<button data-go="language" style="width:100%;text-align:left;display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid var(--e6);border-radius:14px">'
+   +'<div style="flex:1"><div style="font-size:14px">'+cur.n+'</div><div style="font-size:12px;color:var(--ink3);margin-top:2px">'+(cur.k==='auto'?(deviceLang()==='zh'?'目前：中文':'Now: English'):'')+'</div></div>'+ico('arr',15,'#C4C4CC')+'</button>'}},5);
+ return el};
+
+/* 英文字典補這頁 */
+if(typeof EN==='object'){Object.assign(EN,{'語言':'Language','裝置語言（預設）':'Device language (default)','中文（繁體）':'中文（繁體）','即將推出':'Coming soon','目前偵測到中文':'Currently detected: 中文','目前：中文':'Now: 中文','介面語言跟著裝置走；在這裡選了就用你選的。名片與人脈資料不會被翻譯。':'The interface follows your device language; pick one here to override. Cards and contact data are never translated.','已切換':'Language updated','本人維護':'Self-maintained','資料即時':'Live data','個身分':'identities','公開頁 →':'Public page →','引薦':'Refer','資料由本人維護 · 即時':'Kept up to date by them · live'});
+ if(typeof EN_N==='object')Object.keys(EN).forEach(function(k){EN_N[nrm(k)]=EN[k]})}
+
+/* ═════ ② Heycard 用戶的好感度 ═════ */
+(function(){const st=document.createElement('style');st.textContent=`
+.uring{position:relative;flex:0 0 auto;border-radius:99px;padding:2px;background:linear-gradient(135deg,#5C5CFF 0%,#8F8EFF 45%,#00D6B3 100%)}
+.uring>div{border:2px solid #fff;border-radius:99px!important;overflow:hidden;background:#fff}
+.uring>div img,.uring>div svg{width:100%;height:100%;object-fit:cover;display:block}
+.nonu{filter:grayscale(.35);opacity:.9}
+.livedot{display:inline-block;width:6px;height:6px;border-radius:99px;background:var(--turq);margin-right:6px;vertical-align:1px;box-shadow:0 0 0 3px var(--turqS)}
+`;document.head.appendChild(st)})();
+
+/* 用戶頭像：細環（活的）；非用戶：灰階字首磚 */
+function faceRing(c,size){
+ c=c||{};
+ if(c.verified){
+  const inner=size-8;
+  return '<div class="uring" style="width:'+size+'px;height:'+size+'px"><div style="width:'+inner+'px;height:'+inner+'px">'
+   +(c.photo?'<img src="'+esc(c.photo)+'" alt="">':monoSVG(c.name,c.material))+'</div></div>'}
+ return '<div class="nonu">'+faceOf(c,size)+'</div>'}
+
+function liveLine2(c){
+ const l=(typeof liveLine==='function')?liveLine(c):'';
+ if(l)return l;
+ if(c.verified)return '本人維護　·　資料即時';
+ return ''}
+
+rowHTML=function(c){
+ const live=liveLine2(c);
+ return '<div class="row" data-c="'+esc(c.id)+'" role="button" style="width:100%;text-align:left;align-items:center;padding:12px 0;cursor:pointer">'
+ +faceRing(c,52)
+ +'<div class="rt" style="padding-top:1px"><div class="n">'+esc(c.name)+(c.verified?userTick():'')
+ +(c.hot?' <span class="bdg b-m" style="font-size:9.5px;padding:2px 6px">高潛力</span>':'')+'</div>'
+ +'<div class="s">'+esc(idLine(c)||'—')+'</div>'
+ +(live?'<div style="font-size:12.5px;color:'+(c.verified?'var(--mangD)':'var(--ink3)')+';margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(c.verified?'<i class="livedot"></i>':'')+esc(live)+'</div>':'')
+ +'</div>'
+ +(c.verified
+   ?'<button data-msg="'+esc(c.id)+'" style="width:36px;height:36px;border-radius:99px;background:var(--mangS);display:flex;align-items:center;justify-content:center;flex:0 0 auto;align-self:center">'+ico('msg',17,'var(--mang)')+'</button>'
+   :'<span style="align-self:center">'+ico('arr',16,'#C8C8D0')+'</span>')+'</div>'};
+
+/* 詳頁：用戶名片下的活資訊帶＋三顆主行動 */
+const _ct52=SCREENS.contact;
+SCREENS.contact=(a)=>{
+ const el=_ct52(a);
+ const c=S.contact(a&&a.id);if(!c||!c.verified)return el;
+ setTimeout(function(){
+  const card=$('#idcard',el);if(!card)return;
+  const n=1+((c.others&&c.others.length)||0);
+  const upd=c.updated||'3 天前';
+  const strip=h('<div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin:-2px 0 14px">'
+   +'<span class="chip" style="font-size:11.5px;padding:5px 10px;background:var(--turqS);color:var(--turqD)"><i class="livedot" style="box-shadow:none"></i>本人維護　·　'+esc(upd)+'</span>'
+   +(n>1?'<span class="chip" style="font-size:11.5px;padding:5px 10px">'+n+' 個身分</span>':'')
+   +'<button class="chip" data-pub="'+c.id+'" style="font-size:11.5px;padding:5px 10px;color:var(--mang);font-weight:700">公開頁 →</button>'
+   +'</div>');
+  /* 放在「Heycard 用戶 · 資料由本人維護」那行之後 */
+  const info=card.nextElementSibling;
+  if(info&&info.textContent.indexOf('Heycard')>=0){info.parentNode.insertBefore(strip,info.nextSibling);info.style.display='none'}
+  else card.parentNode.insertBefore(strip,card.nextSibling);
+  /* 主行動：傳訊息 ＋ AI 開場 ＋ 引薦 */
+  const main=$('[data-msg]',el);
+  if(main&&main.classList.contains('btn')&&!main.dataset.done){
+   main.dataset.done='1';
+   const row=h('<div style="display:flex;gap:8px;margin-top:8px">'
+    +'<button class="btn tt" data-draft="hello:'+c.id+'" style="flex:1;padding:11px 8px;font-size:13px;gap:6px"><span class="ai" style="font-size:9.5px">AI</span>開場</button>'
+    +'<button class="btn tt" data-refer="'+c.id+'" style="flex:1;padding:11px 8px;font-size:13px;gap:6px">'+ico('share',15,'currentColor')+'引薦</button></div>');
+   main.parentNode.insertBefore(row,main.nextSibling)}
+ },0);
+ return el};
+document.addEventListener('click',function(e){
+ const p=e.target.closest('[data-pub]');if(p){e.stopPropagation();R.go('pubview',{peer:p.dataset.pub},'push');return}
+ const r=e.target.closest('[data-refer]');if(r){e.stopPropagation();R.go('recommend',{cand:r.dataset.refer},'push')}},true);
+/* ═══════════════════════════════════════════
+   v3.3 ㊸：引路人——用設計帶；時機——先判斷「這跟你有沒有關」
+   ─────────────────────────────────────────
+   ① 引路人：拿掉說明句。三張人物磁磚並排：環形頭像、名字、公司簡稱，
+      下面用三個小圖示表示「為什麼是他」（皇冠＝決策層、鑰匙＝唯一窗口、
+      放大鏡＝正在找人），一顆「引薦」。看圖就懂，不用讀。
+   ② 時機的 AI 判讀邏輯（原型是規則版，正式版 LLM 用同一套輸入／門檻）：
+      relevance = 你的專長是否接得上（名片的可提供／產業／職稱／一句話 vs
+                  這波的受益方清單）→ 不接得上就不顯示，這是硬門檻；
+                × 人脈裡符合對象的人數（0 位也可顯示，但改成「發需求」）；
+                × 這波的時效（離截止越近權重越高）。
+      每張卡右上角用一顆「因為你的『行銷』」晶片說明為什麼給你看——
+      這是可解釋性，也是讓人信任 AI 的方式。
+      名片沒填可提供／產業時，不猜：顯示一張「告訴 AI 你做什麼」的引導卡。
+   ═══════════════════════════════════════════ */
+
+/* 小圖示（引路人用）*/
+IC.crown='M3 18h18l-2-9-4 3-3-6-3 6-4-3z';
+IC.key='M14 10a4 4 0 1 0-1.4 3L8 17.6V21h3.4v-2H13v-2h2l1.6-1.6A4 4 0 0 0 14 10z';
+
+/* ═════ ① 引路人磁磚 ═════ */
+function guideTiles(){
+ const cs=S.contacts,H=(typeof hubs==='function')?hubs():[];
+ if(!H.length)return '';
+ return '<div class="sec"><b>引路人</b></div>'
+ +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'
+ +H.slice(0,3).map(function(x){
+   const c=x.c;
+   const why=[
+    (c.level==='決策層'||c.level==='高階主管')?['crown','決策層']:null,
+    (c.company&&cs.filter(function(k){return k.company===c.company}).length===1)?['key','唯一窗口']:null,
+    (S.posts.some(function(p){return p.by===c.id}))?['search','正在找人']:null].filter(Boolean);
+   return '<div style="border:1px solid var(--e6);border-radius:16px;padding:14px 10px 12px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px">'
+   +'<button data-c="'+c.id+'" style="display:flex;flex-direction:column;align-items:center;gap:8px;width:100%">'
+   +(typeof faceRing==='function'?faceRing(c,56):faceOf(c,56))
+   +'<div style="min-width:0;width:100%"><div style="font-size:13.5px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.name)+'</div>'
+   +'<div style="font-size:11px;color:var(--ink3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.company?shortCo(c.company):(c.title||''))+'</div></div></button>'
+   +'<div style="display:flex;gap:6px;justify-content:center;min-height:22px">'
+   +why.map(function(w){return '<span title="'+w[1]+'" aria-label="'+w[1]+'" style="width:22px;height:22px;border-radius:99px;background:var(--fill);display:inline-flex;align-items:center;justify-content:center;color:var(--ink2)">'+ico(w[0],12,'currentColor',2.2)+'</span>'}).join('')
+   +'</div>'
+   +'<button class="btn tt sm" data-draft="ask:'+c.id+'" style="width:100%;padding:8px 6px;font-size:12px">引薦</button>'
+   +'</div>'}).join('')
+ +'</div>'
+ +'<div style="display:flex;gap:12px;justify-content:center;margin-top:10px;font-size:10.5px;color:var(--ink3)">'
+ +[['crown','決策層'],['key','唯一窗口'],['search','正在找人']].map(function(w){return '<span style="display:inline-flex;align-items:center;gap:4px">'+ico(w[0],10,'currentColor',2.2)+w[1]+'</span>'}).join('')+'</div>'}
+
+/* ═════ ② 時機：先判斷相關性 ═════ */
+SEASONS.forEach(function(s){if(s.m.indexOf(12)>=0)s.me=['*']});
+function seasonRelevance(s){
+ const tags=myTags();
+ const fit=s.me.indexOf('*')>=0?['*']:s.me.filter(function(k){return tags.indexOf(k)>=0});
+ if(!fit.length)return {show:false};
+ const hit=seasonMatch(s);
+ const m=new Date().getMonth()+1;
+ const last=s.m[s.m.length-1];
+ const urgency=(last-m)<=0?1:(last-m)===1?.7:.4;
+ return {show:true,fit:fit,hit:hit,score:(fit.length?2:0)+Math.min(hit.length,5)/5+urgency}}
+
+seasonHTML=function(){
+ const me=S.curCard()||{};
+ const has=!!(me.offer||me.industry||me.headline);
+ const ss=seasonNow();if(!ss.length)return '';
+ const head='<div class="sec" style="margin-top:20px"><b>時機</b><span class="ai" style="flex:0 0 auto">AI</span></div>';
+ if(!has)return head
+  +'<button data-fld="offer" style="width:100%;text-align:left;display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px dashed #C8C8D2;border-radius:16px">'
+  +'<div style="width:38px;height:38px;border-radius:12px;background:var(--mangS);display:flex;align-items:center;justify-content:center;flex:0 0 auto">'+ico('flash',18,'var(--mang)')+'</div>'
+  +'<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">先告訴 AI 你能提供什麼</div><div style="font-size:12px;color:var(--ink3);margin-top:2px">填一句，時機就會只挑跟你有關的</div></div>'+ico('arr',15,'#C4C4CC')+'</button>';
+ const list=ss.map(function(s){return Object.assign({s:s},seasonRelevance(s))}).filter(function(x){return x.show}).sort(function(a,b){return b.score-a.score}).slice(0,2);
+ if(!list.length)return head+'<div style="font-size:13px;color:var(--ink3);padding:4px 0">這個月的商業節奏跟你的專長沒有直接關係，AI 就不打擾你。</div>';
+ return head+list.map(function(x){
+   const s=x.s,hit=x.hit,fit=x.fit;
+   const faces=hit.slice(0,4).map(function(c){return '<span style="margin-right:-8px;border:2px solid #fff;border-radius:99px;display:inline-flex">'+faceOf(c,28)+'</span>'}).join('');
+   const because=fit[0]==='*'?'':'<span style="font-size:10.5px;color:var(--mangD);background:var(--mangS);padding:3px 8px;border-radius:99px;white-space:nowrap">因為你的「'+esc(fit[0])+'」</span>';
+   const primary=(s.act==='compose'&&s.role)
+    ?'<button class="btn sm" data-compose-role="'+esc(s.role)+'">發需求</button>'
+    :'<button class="btn sm" data-season-hello="'+(hit[0]?hit[0].id:'')+'"'+(hit[0]?'':' disabled')+'>打招呼</button>';
+   const second=hit.length?'<button class="btn tt sm" data-season-list="'+SEASONS.indexOf(s)+'">看這 '+hit.length+' 位</button>':'';
+   return '<div style="padding:16px;border:1px solid var(--e6);border-radius:16px;margin-bottom:10px">'
+   +'<div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--fe);font-size:10.5px;font-weight:800;letter-spacing:.06em;color:var(--mang);background:var(--mangS);padding:3px 7px;border-radius:99px">'+['','1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'][new Date().getMonth()+1]+'</span>'
+   +'<b style="font-size:14.5px;font-weight:800;letter-spacing:-.01em;flex:1;min-width:0">'+esc(s.t)+'</b>'+because+'</div>'
+   +'<div style="font-size:12.5px;color:var(--ink2);line-height:1.7;margin-top:8px"><span>'+esc(s.w)+'</span></div>'
+   +'<div style="display:flex;align-items:center;margin-top:12px;gap:14px">'
+   +(faces?'<div style="display:flex;align-items:center;padding-left:2px">'+faces+'</div>':'')
+   +'<span style="font-size:12px;color:var(--ink3);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(hit.length?'<b style="color:var(--ink)">'+hit.length+'</b> <span>位對象</span>':'<span>還沒有對象，先發需求</span>')+'</span>'
+   +'</div>'
+   +'<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">'+primary+second+'</div>'
+   +'</div>'}).join('')};
+
+/* 把洞察裡的引路人段落換成磁磚版 */
+const _core53=insightsCore;
+insightsCore=function(){
+ let html=_core53();
+ const a=html.indexOf('<div class="sec"><b>引路人</b></div>');
+ if(a<0)return html;
+ const b=html.indexOf('<div class="sec"><b>判斷</b></div>',a);
+ const end=b<0?html.lastIndexOf('</div>'):b;
+ return html.slice(0,a)+guideTiles()+html.slice(end)};
+
+if(typeof EN==='object'){Object.assign(EN,{'唯一窗口':'Sole contact','引薦':'Refer','位對象':'people','還沒有對象，先發需求':'No one yet — post a request','先告訴 AI 你能提供什麼':'Tell AI what you offer first','填一句，時機就會只挑跟你有關的':'One line, and Timing only shows what concerns you','這個月的商業節奏跟你的專長沒有直接關係，AI 就不打擾你。':'This month\'s business rhythm doesn\'t touch your field, so AI stays quiet.'});
+ if(typeof EN_N==='object')Object.keys(EN).forEach(function(k){EN_N[nrm(k)]=EN[k]});
+ EN_RX.push([/^因為你的「(.+)」$/,'Because of your "$1"'])}
 
 /* ═════════ 通知中心 ═════════ */
 SCREENS.notif=()=>screen(tbTitle('通知')
